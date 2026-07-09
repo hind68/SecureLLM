@@ -1,0 +1,10 @@
+{
+  "model": "secure-gpt",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Bonjour, reponds en une phrase pour confirmer que LiteLLM fonctionne."
+    }
+  ]
+}
+

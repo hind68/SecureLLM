@@ -1,0 +1,9 @@
+{
+  "model": "secure-groq",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Bonjour, réponds en une phrase pour confirmer que Groq fonctionne avec LiteLLM."
+    }
+  ]
+}
