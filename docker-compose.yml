@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-secure_llm_gateway}
+      POSTGRES_USER: ${POSTGRES_USER:-secure_llm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_local_only}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - secure_llm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-secure_llm_user} -d ${POSTGRES_DB:-secure_llm_gateway}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   litellm:
     image: docker.litellm.ai/berriai/litellm:latest
     container_name: secure-llm-litellm
@@ -23,3 +40,6 @@ services:
       - "4000"
       - "--detailed_debug"
     restart: unless-stopped
+
+volumes:
+  secure_llm_postgres_data:

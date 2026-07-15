@@ -43,7 +43,7 @@ Not included yet:
 
 - Spring Boot backend
 - React frontend
-- PostgreSQL database
+- Additional PostgreSQL domain tables
 - Authentication and roles
 - Prompt filtering
 - Sensitive data masking/blocking

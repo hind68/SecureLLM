@@ -2,8 +2,10 @@ package com.example.backend.service;
 
 import com.example.backend.dto.ChatRequest;
 import com.example.backend.dto.ChatResponse;
+import com.example.backend.entity.ModeleLlm;
+import com.example.backend.entity.StatutModeleLlm;
+import com.example.backend.repository.ModeleLlmRepository;
 import java.util.List;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -12,26 +14,23 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 @Service
 public class ChatService {
 
-    private static final List<String> AVAILABLE_MODELS = List.of(
-            "secure-groq",
-            "secure-mistral",
-            "secure-gemini"
-    );
-
-    private static final Set<String> ALLOWED_MODELS = Set.copyOf(AVAILABLE_MODELS);
-
     private final LiteLlmService liteLlmService;
+    private final ModeleLlmRepository modeleLlmRepository;
 
-    public ChatService(LiteLlmService liteLlmService) {
+    public ChatService(LiteLlmService liteLlmService, ModeleLlmRepository modeleLlmRepository) {
         this.liteLlmService = liteLlmService;
+        this.modeleLlmRepository = modeleLlmRepository;
     }
 
     public List<String> getAvailableModels() {
-        return AVAILABLE_MODELS;
+        return modeleLlmRepository.findByStatutOrderByIdAsc(StatutModeleLlm.ACTIF)
+                .stream()
+                .map(ModeleLlm::getAliasInterne)
+                .toList();
     }
 
     public ChatResponse chat(ChatRequest request) {
-        if (!ALLOWED_MODELS.contains(request.model())) {
+        if (!modeleLlmRepository.existsByAliasInterneAndStatut(request.model(), StatutModeleLlm.ACTIF)) {
             throw new ResponseStatusException(BAD_REQUEST, "Unsupported model: " + request.model());
         }
 
