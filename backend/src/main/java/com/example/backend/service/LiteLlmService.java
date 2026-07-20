@@ -3,6 +3,7 @@ package com.example.backend.service;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -29,12 +30,13 @@ public class LiteLlmService {
     }
 
     public String chat(String model, String message) {
+        return chat(model, List.of(new LiteLlmMessage("user", message)));
+    }
+
+    public String chat(String model, List<LiteLlmMessage> messages) {
         Map<String, Object> body = Map.of(
                 "model", model,
-                "messages", List.of(Map.of(
-                        "role", "user",
-                        "content", message
-                ))
+                "messages", toPayload(messages)
         );
 
         Map<?, ?> response = webClient.post()
@@ -52,6 +54,99 @@ public class LiteLlmService {
         }
 
         return answer;
+    }
+
+    public void streamChat(
+            String model,
+            List<LiteLlmMessage> messages,
+            Consumer<String> onToken,
+            Runnable onComplete,
+            Consumer<Throwable> onError
+    ) {
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "stream", true,
+                "messages", toPayload(messages)
+        );
+
+        webClient.post()
+                .uri("/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + masterKey)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .map(this::extractStreamingToken)
+                .filter(token -> !token.isBlank())
+                .subscribe(onToken, onError, onComplete);
+    }
+
+    private List<Map<String, String>> toPayload(List<LiteLlmMessage> messages) {
+        return messages.stream()
+                .map(message -> Map.of(
+                        "role", message.role(),
+                        "content", message.content()
+                ))
+                .toList();
+    }
+
+    private String extractStreamingToken(String chunk) {
+        StringBuilder token = new StringBuilder();
+        for (String line : chunk.split("\\R")) {
+            String normalized = line.trim();
+            if (normalized.isBlank() || normalized.equals("data: [DONE]") || normalized.equals("[DONE]")) {
+                continue;
+            }
+
+            if (normalized.startsWith("data:")) {
+                normalized = normalized.substring(5).trim();
+            }
+
+            token.append(extractContentField(normalized));
+        }
+        return token.toString();
+    }
+
+    private String extractContentField(String json) {
+        String marker = "\"content\"";
+        int markerIndex = json.indexOf(marker);
+        if (markerIndex < 0) {
+            return "";
+        }
+
+        int colonIndex = json.indexOf(':', markerIndex + marker.length());
+        if (colonIndex < 0) {
+            return "";
+        }
+
+        int startQuote = json.indexOf('"', colonIndex + 1);
+        if (startQuote < 0) {
+            return "";
+        }
+
+        StringBuilder value = new StringBuilder();
+        boolean escaped = false;
+        for (int i = startQuote + 1; i < json.length(); i++) {
+            char current = json.charAt(i);
+            if (escaped) {
+                value.append(switch (current) {
+                    case 'n' -> '\n';
+                    case 'r' -> '\r';
+                    case 't' -> '\t';
+                    case '"', '\\', '/' -> current;
+                    default -> current;
+                });
+                escaped = false;
+            } else if (current == '\\') {
+                escaped = true;
+            } else if (current == '"') {
+                return value.toString();
+            } else {
+                value.append(current);
+            }
+        }
+        return "";
     }
 
     private String extractAnswer(Map<?, ?> response) {

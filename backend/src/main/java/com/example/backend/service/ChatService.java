@@ -2,6 +2,7 @@ package com.example.backend.service;
 
 import com.example.backend.dto.ChatRequest;
 import com.example.backend.dto.ChatResponse;
+import com.example.backend.dto.ModelDto;
 import com.example.backend.entity.ModeleLlm;
 import com.example.backend.entity.StatutModeleLlm;
 import com.example.backend.repository.ModeleLlmRepository;
@@ -26,6 +27,13 @@ public class ChatService {
         return modeleLlmRepository.findByStatutOrderByIdAsc(StatutModeleLlm.ACTIF)
                 .stream()
                 .map(ModeleLlm::getAliasInterne)
+                .toList();
+    }
+
+    public List<ModelDto> getAvailableModelDetails() {
+        return modeleLlmRepository.findByStatutOrderByIdAsc(StatutModeleLlm.ACTIF)
+                .stream()
+                .map(model -> new ModelDto(model.getAliasInterne(), model.getNomAffichage()))
                 .toList();
     }
 

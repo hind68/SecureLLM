@@ -30,6 +30,9 @@ public class ModeleLlm {
     @Column(name = "nom_modele_provider", nullable = false, length = 150)
     private String nomModeleProvider;
 
+    @Column(name = "nom_affichage", nullable = false, length = 100)
+    private String nomAffichage;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StatutModeleLlm statut;
@@ -37,10 +40,11 @@ public class ModeleLlm {
     protected ModeleLlm() {
     }
 
-    public ModeleLlm(FournisseurLlm fournisseur, String aliasInterne, String nomModeleProvider, StatutModeleLlm statut) {
+    public ModeleLlm(FournisseurLlm fournisseur, String aliasInterne, String nomModeleProvider, String nomAffichage, StatutModeleLlm statut) {
         this.fournisseur = fournisseur;
         this.aliasInterne = aliasInterne;
         this.nomModeleProvider = nomModeleProvider;
+        this.nomAffichage = nomAffichage;
         this.statut = statut;
     }
 
@@ -58,6 +62,10 @@ public class ModeleLlm {
 
     public String getNomModeleProvider() {
         return nomModeleProvider;
+    }
+
+    public String getNomAffichage() {
+        return nomAffichage;
     }
 
     public StatutModeleLlm getStatut() {

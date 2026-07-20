@@ -38,8 +38,8 @@ class ChatServiceTest {
         FournisseurLlm mistral = new FournisseurLlm("mistral", "Mistral", StatutFournisseurLlm.ACTIF);
         when(modeleLlmRepository.findByStatutOrderByIdAsc(StatutModeleLlm.ACTIF))
                 .thenReturn(List.of(
-                        new ModeleLlm(groq, "secure-groq", "groq/llama-3.1-8b-instant", StatutModeleLlm.ACTIF),
-                        new ModeleLlm(mistral, "secure-mistral", "mistral/mistral-small-latest", StatutModeleLlm.ACTIF)
+                        new ModeleLlm(groq, "secure-groq", "groq/llama-3.1-8b-instant", "Groq", StatutModeleLlm.ACTIF),
+                        new ModeleLlm(mistral, "secure-mistral", "mistral/mistral-small-latest", "Mistral", StatutModeleLlm.ACTIF)
                 ));
 
         List<String> models = chatService.getAvailableModels();
