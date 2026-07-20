@@ -24,6 +24,7 @@ function App() {
   const [isSending, setIsSending] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false')
   const [showModelsExplorer, setShowModelsExplorer] = useState(false)
+  const [isModelGalleryOpen, setIsModelGalleryOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [collapsedPanel, setCollapsedPanel] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -38,6 +39,8 @@ function App() {
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
   const localIdCounterRef = useRef(0)
+  const shouldAutoScrollRef = useRef(true)
+  const scrollFrameRef = useRef(null)
 
   const activeModelAlias = activeConversation?.modelAlias || selectedModel
   const activeModel = models.find((model) => model.alias === activeModelAlias)
@@ -52,6 +55,39 @@ function App() {
     textarea.style.height = `${nextHeight}px`
     setIsComposerMaxed(textarea.scrollHeight > 150)
   }, [])
+
+  const scrollMessagesToBottom = useCallback((behavior = 'auto') => {
+    const element = messagesRef.current
+    if (!element) return
+
+    if (scrollFrameRef.current) {
+      cancelAnimationFrame(scrollFrameRef.current)
+    }
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      if (behavior === 'smooth') {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      } else {
+        element.scrollTop = element.scrollHeight
+      }
+      scrollFrameRef.current = null
+    })
+  }, [])
+
+  const closeTransientMenus = useCallback(() => {
+    setOpenMenuId(null)
+    setIsHeaderMenuOpen(false)
+    setIsAccountMenuOpen(false)
+    setIsModelMenuOpen(false)
+    setCollapsedPanel(null)
+  }, [])
+
+  const closeSidebarPanels = useCallback(() => {
+    closeTransientMenus()
+    setShowModelsExplorer(false)
+    setIsFilterOpen(false)
+    setIsModelGalleryOpen(false)
+  }, [closeTransientMenus])
 
   const loadModels = useCallback(async () => {
     setIsLoadingModels(true)
@@ -121,22 +157,15 @@ function App() {
   useEffect(() => {
     function closeMenus(event) {
       if (!event.target.closest('[data-menu-root]')) {
-        setOpenMenuId(null)
-        setIsHeaderMenuOpen(false)
-        setIsModelMenuOpen(false)
-        setIsAccountMenuOpen(false)
-        setCollapsedPanel(null)
+        closeTransientMenus()
       }
     }
 
     function closeOnEscape(event) {
       if (event.key === 'Escape') {
-        setOpenMenuId(null)
-        setIsHeaderMenuOpen(false)
-        setIsModelMenuOpen(false)
-        setIsAccountMenuOpen(false)
+        closeTransientMenus()
         setModelDecision(null)
-        setCollapsedPanel(null)
+        setIsModelGalleryOpen(false)
       }
     }
 
@@ -146,17 +175,23 @@ function App() {
       document.removeEventListener('mousedown', closeMenus)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [])
+  }, [closeSidebarPanels, closeTransientMenus])
 
   useEffect(() => {
-    if (isLastBlockVisible) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (shouldAutoScrollRef.current) {
+      scrollMessagesToBottom('auto')
     }
-  }, [messages, isLastBlockVisible])
+  }, [messages, scrollMessagesToBottom])
 
   useEffect(() => {
     resizeTextarea()
   }, [draft, resizeTextarea])
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current) {
+      cancelAnimationFrame(scrollFrameRef.current)
+    }
+  }, [])
 
   async function openConversation(conversation) {
     if (isSending) return
@@ -165,6 +200,7 @@ function App() {
       setActiveConversation(conversation)
       setSelectedModel(conversation.modelAlias)
       setIsLastBlockVisible(true)
+      shouldAutoScrollRef.current = true
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages`)
       if (!response.ok) throw new Error('messages')
       setMessages(await response.json())
@@ -182,6 +218,7 @@ function App() {
     setChatError('')
     setSelectedModel(modelAlias)
     setIsLastBlockVisible(true)
+    shouldAutoScrollRef.current = true
     closeSidePanelOnMobile()
   }
 
@@ -216,6 +253,7 @@ function App() {
     setIsSending(true)
     setDraft('')
     setIsLastBlockVisible(true)
+    shouldAutoScrollRef.current = true
 
     try {
       const conversation = await ensureConversation(prompt)
@@ -419,19 +457,15 @@ function App() {
     const element = messagesRef.current
     if (!element) return
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight
-    const lastMessage = element.querySelector('.message:last-of-type')
-    if (!lastMessage) {
-      setIsLastBlockVisible(distanceFromBottom < 80)
-      return
-    }
-    const containerRect = element.getBoundingClientRect()
-    const lastMessageRect = lastMessage.getBoundingClientRect()
-    setIsLastBlockVisible(lastMessageRect.bottom <= containerRect.bottom - 6)
+    const isNearBottom = distanceFromBottom < 90
+    shouldAutoScrollRef.current = isNearBottom
+    setIsLastBlockVisible(isNearBottom)
   }
 
   function goToBottom() {
     setIsLastBlockVisible(true)
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    shouldAutoScrollRef.current = true
+    scrollMessagesToBottom('smooth')
   }
 
   function handleKeyDown(event) {
@@ -442,11 +476,12 @@ function App() {
   }
 
   function closeMenus() {
-    setOpenMenuId(null)
-    setIsHeaderMenuOpen(false)
-    setIsAccountMenuOpen(false)
-    setIsModelMenuOpen(false)
-    setCollapsedPanel(null)
+    closeTransientMenus()
+  }
+
+  function toggleSidebar() {
+    closeSidebarPanels()
+    setIsSidebarOpen((current) => !current)
   }
 
   function toggleCollapsedPanel(panel) {
@@ -454,11 +489,17 @@ function App() {
     setIsHeaderMenuOpen(false)
     setIsModelMenuOpen(false)
     setIsAccountMenuOpen(false)
+    setShowModelsExplorer(false)
+    setIsModelGalleryOpen(false)
+    if (panel !== 'search') {
+      setIsFilterOpen(false)
+    }
     setCollapsedPanel((current) => (current === panel ? null : panel))
   }
 
   function closeSidePanelOnMobile() {
     if (window.innerWidth < 820) {
+      closeSidebarPanels()
       setIsSidebarOpen(false)
     }
   }
@@ -474,7 +515,7 @@ function App() {
 
   return (
     <div className={`app-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-      {isSidebarOpen && <button className="mobile-overlay" type="button" aria-label="Fermer" onClick={() => setIsSidebarOpen(false)} />}
+      {isSidebarOpen && <button className="mobile-overlay" type="button" aria-label="Fermer" onClick={toggleSidebar} />}
 
       <aside className="sidebar" aria-label="Navigation Synapse">
         <div className="sidebar-header">
@@ -483,7 +524,10 @@ function App() {
             type="button"
             aria-label={isSidebarOpen ? 'Synapse' : 'Ouvrir la sidebar'}
             onClick={() => {
-              if (!isSidebarOpen) setIsSidebarOpen(true)
+              if (!isSidebarOpen) {
+                closeSidebarPanels()
+                setIsSidebarOpen(true)
+              }
             }}
           >
             <span className="sidebar-logo" aria-hidden="true">
@@ -498,14 +542,14 @@ function App() {
             title={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
             aria-label={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
             aria-expanded={isSidebarOpen}
-            onClick={() => setIsSidebarOpen((current) => !current)}
+            onClick={toggleSidebar}
           >
             <img src="/assets/sidebar.png" alt="" />
           </button>
         </div>
 
         <nav className="sidebar-navigation" aria-label="Actions principales">
-          <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { setCollapsedPanel(null); newConversation() }}>
+          <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { closeSidebarPanels(); newConversation() }}>
             <img src="/assets/new-tab.png" alt="" />
             <span>Nouvelle conversation</span>
           </button>
@@ -515,6 +559,9 @@ function App() {
             aria-label="Rechercher"
             onClick={() => {
               if (isSidebarOpen) {
+                setShowModelsExplorer(false)
+                setIsModelGalleryOpen(false)
+                setCollapsedPanel(null)
                 setIsFilterOpen((current) => !current)
               } else {
                 setShowArchived(false)
@@ -532,7 +579,13 @@ function App() {
             aria-label="Discussions recentes"
             onClick={() => {
               setShowArchived(false)
-              if (!isSidebarOpen) {
+              if (isSidebarOpen) {
+                setCollapsedPanel(null)
+                setShowModelsExplorer(false)
+                setIsModelGalleryOpen(false)
+                setIsFilterOpen(false)
+                setOpenMenuId(null)
+              } else {
                 setIsFilterOpen(false)
                 toggleCollapsedPanel('history')
               }
@@ -547,6 +600,8 @@ function App() {
             aria-label="Explorer les modeles"
             onClick={() => {
               if (isSidebarOpen) {
+                setCollapsedPanel(null)
+                setIsFilterOpen(false)
                 setShowModelsExplorer((current) => !current)
               } else {
                 setIsFilterOpen(false)
@@ -559,8 +614,11 @@ function App() {
           </button>
         </nav>
 
-        {showModelsExplorer && (
+        {isSidebarOpen && showModelsExplorer && (
           <div className="models-panel">
+            <button className="models-panel-all" type="button" onClick={() => setIsModelGalleryOpen(true)}>
+              Voir tous les modeles
+            </button>
             {models.map((model) => (
               <button key={model.alias} type="button" onClick={() => selectModel(model.alias)} disabled={isSending}>
                 <strong>{model.displayName}</strong>
@@ -614,8 +672,8 @@ function App() {
               <strong>Hind Alami</strong>
             </span>
           </button>
-          {isAccountMenuOpen && (
-            <div className="account-popover" role="menu">
+          {isSidebarOpen && isAccountMenuOpen && (
+            <div className="account-popover account-popover-open" role="menu">
               <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
                 Conversations archivees
               </button>
@@ -626,6 +684,17 @@ function App() {
           )}
         </div>
       </aside>
+
+      {!isSidebarOpen && isAccountMenuOpen && (
+        <div className="account-popover account-popover-collapsed" role="menu" data-menu-root>
+          <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
+            Conversations archivees
+          </button>
+          <button type="button" role="menuitem">
+            Se deconnecter
+          </button>
+        </div>
+      )}
 
       {!isSidebarOpen && collapsedPanel && (
         <div className="collapsed-panel" data-menu-root>
@@ -646,6 +715,9 @@ function App() {
 
           {collapsedPanel === 'models' ? (
             <div className="collapsed-model-list">
+              <button className="collapsed-model-gallery" type="button" onClick={() => { setIsModelGalleryOpen(true); setCollapsedPanel(null) }}>
+                Voir tous les modeles
+              </button>
               {models.map((model) => (
                 <button
                   key={model.alias}
@@ -728,15 +800,75 @@ function App() {
           </div>
         </header>
 
+        {isModelGalleryOpen && (
+          <section className="model-gallery" aria-labelledby="model-gallery-title" data-menu-root>
+            <div className="model-gallery-header">
+              <div>
+                <span>Catalogue</span>
+                <h2 id="model-gallery-title">Explorer les modeles</h2>
+              </div>
+              <button type="button" aria-label="Fermer l explorateur" onClick={() => setIsModelGalleryOpen(false)}>
+                <span aria-hidden="true">x</span>
+              </button>
+            </div>
+
+            <div className="model-card-grid">
+              {models.map((model) => {
+                const meta = modelCardMeta(model.alias)
+                return (
+                  <article className="model-card" key={model.alias}>
+                    <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
+                      <span>{meta.initials}</span>
+                    </div>
+                    <div className="model-card-copy">
+                      <div className="model-card-topline">
+                        <span>{modelProviderName(model.alias)}</span>
+                      </div>
+                      <h3>{model.displayName}</h3>
+                      <p>{meta.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectModel(model.alias)
+                        setIsModelGalleryOpen(false)
+                      }}
+                      disabled={isSending}
+                    >
+                      Utiliser ce modele
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         <section
-          className={`messages ${isComposerMaxed ? 'show-scrollbar' : ''}`}
+          className="messages"
           ref={messagesRef}
           onScroll={onMessagesScroll}
           aria-live="polite"
         >
           {!hasActiveMessages && (
-            <div className="empty-state">
-              <h2>Comment puis-je vous aider ?</h2>
+            <div className="welcome-stack">
+              <div className="empty-state">
+                <h2>Par quoi voulez-vous commencer ?</h2>
+              </div>
+              <form className={`composer composer-welcome ${isComposerMaxed ? 'composer-maxed' : ''}`} onSubmit={sendMessage}>
+                <textarea
+                  ref={textareaRef}
+                  disabled={isSending}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Poser une question"
+                  rows={1}
+                  value={draft}
+                />
+                <button type="submit" aria-label="Envoyer" disabled={!canSend}>
+                  {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
+                </button>
+              </form>
             </div>
           )}
 
@@ -752,20 +884,22 @@ function App() {
           </button>
         )}
 
-        <form className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-center'}`} onSubmit={sendMessage}>
-          <textarea
-            ref={textareaRef}
-            disabled={isSending}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Poser une question"
-            rows={1}
-            value={draft}
-          />
-          <button type="submit" aria-label="Envoyer" disabled={!canSend}>
-            {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
-          </button>
-        </form>
+        {hasActiveMessages && (
+          <form className={`composer composer-bottom ${isComposerMaxed ? 'composer-maxed' : ''}`} onSubmit={sendMessage}>
+            <textarea
+              ref={textareaRef}
+              disabled={isSending}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Poser une question"
+              rows={1}
+              value={draft}
+            />
+            <button type="submit" aria-label="Envoyer" disabled={!canSend}>
+              {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
+            </button>
+          </form>
+        )}
 
         {chatError && (
           <div className="inline-error" role="alert">
@@ -946,6 +1080,41 @@ function modelProviderName(alias) {
     'secure-claude': 'Anthropic',
   }
   return providers[alias] || 'Provider'
+}
+
+function modelCardMeta(alias) {
+  const metas = {
+    'secure-gpt': {
+      initials: 'GPT',
+      tone: 'tone-openai',
+      description: 'Modele generaliste adapte aux reponses concises, au raisonnement et aux usages quotidiens.',
+    },
+    'secure-groq': {
+      initials: 'GQ',
+      tone: 'tone-groq',
+      description: 'Modele rapide pour tester les conversations et obtenir des reponses reactives.',
+    },
+    'secure-gemini': {
+      initials: 'GM',
+      tone: 'tone-gemini',
+      description: 'Modele polyvalent pour explorer, reformuler et structurer des idees.',
+    },
+    'secure-mistral': {
+      initials: 'MS',
+      tone: 'tone-mistral',
+      description: 'Modele efficace pour les taches pratiques, les syntheses et les prompts directs.',
+    },
+    'secure-claude': {
+      initials: 'CL',
+      tone: 'tone-claude',
+      description: 'Modele oriente redaction, analyse longue et conversations soignees.',
+    },
+  }
+  return metas[alias] || {
+    initials: cleanModelName(alias, alias).slice(0, 2).toUpperCase(),
+    tone: 'tone-default',
+    description: 'Modele disponible dans le catalogue Secure LLM Gateway.',
+  }
 }
 
 function titleFrom(content) {
