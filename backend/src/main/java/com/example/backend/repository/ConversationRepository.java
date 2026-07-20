@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -70,4 +71,12 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
               and c.utilisateur = :utilisateur
             """)
     Optional<Conversation> findOwnedById(@Param("id") Long id, @Param("utilisateur") Utilisateur utilisateur);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            delete from Conversation c
+            where c.id = :id
+              and c.utilisateur = :utilisateur
+            """)
+    int deleteOwnedById(@Param("id") Long id, @Param("utilisateur") Utilisateur utilisateur);
 }

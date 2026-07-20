@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
@@ -19,12 +19,15 @@ function App() {
   const [draft, setDraft] = useState('')
   const [historyError, setHistoryError] = useState('')
   const [chatError, setChatError] = useState('')
+  const [chatNotice, setChatNotice] = useState('')
+  const [copiedKey, setCopiedKey] = useState('')
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false')
   const [activeView, setActiveView] = useState('chat')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
   const [collapsedPanel, setCollapsedPanel] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false)
@@ -33,10 +36,14 @@ function App() {
   const [modelDecision, setModelDecision] = useState(null)
   const [isLastBlockVisible, setIsLastBlockVisible] = useState(true)
   const [isComposerMaxed, setIsComposerMaxed] = useState(false)
+  const [isComposerTransitioning, setIsComposerTransitioning] = useState(false)
 
   const messagesRef = useRef(null)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+  const composerRef = useRef(null)
+  const composerBeforeRectRef = useRef(null)
+  const composerTimerRef = useRef(null)
   const localIdCounterRef = useRef(0)
   const shouldAutoScrollRef = useRef(true)
   const scrollFrameRef = useRef(null)
@@ -85,8 +92,19 @@ function App() {
   const closeSidebarPanels = useCallback(() => {
     closeTransientMenus()
     setIsFilterOpen(false)
+    setIsAdvancedFiltersOpen(false)
     setActiveView('chat')
   }, [closeTransientMenus])
+
+  const showError = useCallback((message) => {
+    setChatNotice('')
+    setChatError(message)
+  }, [])
+
+  const showNotice = useCallback((message) => {
+    setChatError('')
+    setChatNotice(message)
+  }, [])
 
   const loadModels = useCallback(async () => {
     setIsLoadingModels(true)
@@ -112,12 +130,12 @@ function App() {
         setSelectedModel((current) => current || normalized[0]?.alias || '')
         setChatError('')
       } catch {
-        setChatError('Impossible de charger les modeles.')
+        showError('Impossible de charger les modeles.')
       }
     } finally {
       setIsLoadingModels(false)
     }
-  }, [])
+  }, [showError])
 
   const loadConversations = useCallback(async () => {
     setIsLoadingHistory(true)
@@ -165,6 +183,8 @@ function App() {
         closeTransientMenus()
         setModelDecision(null)
         setActiveView('chat')
+        setChatError('')
+        setChatNotice('')
       }
     }
 
@@ -175,6 +195,45 @@ function App() {
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [closeSidebarPanels, closeTransientMenus])
+
+  useEffect(() => {
+    if (!chatError && !chatNotice) return undefined
+    const timeout = window.setTimeout(() => {
+      setChatError('')
+      setChatNotice('')
+    }, 5000)
+    return () => window.clearTimeout(timeout)
+  }, [chatError, chatNotice])
+
+  useLayoutEffect(() => {
+    const element = composerRef.current
+    const before = composerBeforeRectRef.current
+    if (!element || !before) return
+
+    const after = element.getBoundingClientRect()
+    const deltaX = before.left - after.left
+    const deltaY = before.top - after.top
+    composerBeforeRectRef.current = null
+
+    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+
+    setIsComposerTransitioning(true)
+    element.animate(
+      [
+        { transform: `translate(${deltaX}px, ${deltaY}px)` },
+        { transform: 'translate(0, 0)' },
+      ],
+      {
+        duration: 340,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+    )
+
+    if (composerTimerRef.current) {
+      window.clearTimeout(composerTimerRef.current)
+    }
+    composerTimerRef.current = window.setTimeout(() => setIsComposerTransitioning(false), 360)
+  }, [hasActiveMessages])
 
   useEffect(() => {
     if (shouldAutoScrollRef.current) {
@@ -190,12 +249,16 @@ function App() {
     if (scrollFrameRef.current) {
       cancelAnimationFrame(scrollFrameRef.current)
     }
-  }, [])
+    if (composerTimerRef.current) {
+      window.clearTimeout(composerTimerRef.current)
+    }
+  }, [showError])
 
   async function openConversation(conversation) {
     if (isSending) return
     try {
       setChatError('')
+      closeTransientMenus()
       setActiveConversation(conversation)
       setSelectedModel(conversation.modelAlias)
       setIsLastBlockVisible(true)
@@ -205,7 +268,7 @@ function App() {
       setMessages(await response.json())
       closeSidePanelOnMobile()
     } catch {
-      setChatError('Impossible de reprendre cette conversation.')
+      showError('Impossible de reprendre cette conversation.')
     }
   }
 
@@ -215,6 +278,7 @@ function App() {
     setMessages([])
     setDraft('')
     setChatError('')
+    closeTransientMenus()
     setSelectedModel(modelAlias)
     setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
@@ -244,11 +308,14 @@ function App() {
     event.preventDefault()
     const prompt = draft.trim()
     if (!prompt) {
-      setChatError('Le message ne peut pas etre vide.')
+      showError('Le message ne peut pas etre vide.')
       return
     }
 
     setChatError('')
+    if (!hasActiveMessages && composerRef.current) {
+      composerBeforeRectRef.current = composerRef.current.getBoundingClientRect()
+    }
     setIsSending(true)
     setDraft('')
     setIsLastBlockVisible(true)
@@ -259,7 +326,7 @@ function App() {
       await streamMessage(conversation, prompt)
       await loadConversations()
     } catch {
-      setChatError('La requete a echoue. Verifiez Spring Boot, LiteLLM et le provider.')
+      showError('La requete a echoue. Verifiez Spring Boot, LiteLLM et le provider.')
     } finally {
       setIsSending(false)
     }
@@ -375,7 +442,7 @@ function App() {
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       closeMenus()
     } catch {
-      setChatError('Impossible de renommer la conversation.')
+      showError('Impossible de renommer la conversation.')
     }
   }
 
@@ -384,6 +451,7 @@ function App() {
     try {
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('archive')
+      setConversations((current) => current.filter((item) => item.id !== conversation.id))
       if (activeConversation?.id === conversation.id) {
         setActiveConversation(null)
         setMessages([])
@@ -391,24 +459,42 @@ function App() {
       closeMenus()
       await loadConversations()
     } catch {
-      setChatError('Impossible d archiver la conversation.')
+      showError('Impossible d archiver la conversation.')
     }
   }
 
   async function deleteConversation(conversation = activeConversation) {
     if (!conversation || isSending) return
+    if (!conversation.id) {
+      showError('Impossible de supprimer cette conversation: identifiant manquant.')
+      logDevelopmentError('delete conversation missing id', conversation)
+      return
+    }
     if (!window.confirm('Supprimer definitivement cette conversation ?')) return
+    const deleteUrl = `${API_BASE_URL}/conversations/${conversation.id}/permanent`
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/permanent`, { method: 'DELETE' })
-      if (!response.ok) throw new Error('delete')
+      const response = await fetch(deleteUrl, { method: 'DELETE' })
+      if (!response.ok) {
+        const message = await deletionErrorMessage(response)
+        logDevelopmentError('delete conversation failed', {
+          id: conversation.id,
+          method: 'DELETE',
+          status: response.status,
+          url: deleteUrl,
+          message,
+        })
+        throw new Error(message)
+      }
+      setConversations((current) => current.filter((item) => item.id !== conversation.id))
       if (activeConversation?.id === conversation.id) {
         setActiveConversation(null)
         setMessages([])
       }
       closeMenus()
+      showNotice('Conversation supprimee.')
       await loadConversations()
-    } catch {
-      setChatError('Impossible de supprimer la conversation.')
+    } catch (error) {
+      showError(requestErrorMessage(error, 'Impossible de supprimer la conversation.'))
     }
   }
 
@@ -431,14 +517,14 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ modelAlias: alias }),
       })
-      if (!response.ok) throw new Error('change model')
+      if (!response.ok) throw new Error(await requestStatusMessage(response, 'Impossible de changer le modele.'))
       const updated = await response.json()
       setActiveConversation(updated)
       setSelectedModel(updated.modelAlias)
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setModelDecision(null)
-    } catch {
-      setChatError('Impossible de changer le modele.')
+    } catch (error) {
+      showError(requestErrorMessage(error, 'Impossible de changer le modele.'))
     }
   }
 
@@ -448,7 +534,7 @@ function App() {
       await createConversation(alias, 'Nouvelle conversation')
       setModelDecision(null)
     } catch {
-      setChatError('Impossible de creer une nouvelle conversation.')
+      showError('Impossible de creer une nouvelle conversation.')
     }
   }
 
@@ -514,7 +600,7 @@ function App() {
     <div className={`app-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
       {isSidebarOpen && <button className="mobile-overlay" type="button" aria-label="Fermer" onClick={toggleSidebar} />}
 
-      <aside className="sidebar" aria-label="Navigation Synapse">
+      <aside className="sidebar" aria-label="Navigation Synapse" data-menu-root>
         <div className="sidebar-header">
           <button
             className="sidebar-brand"
@@ -528,8 +614,8 @@ function App() {
             }}
           >
             <span className="sidebar-logo" aria-hidden="true">
-              <img className="sidebar-logo-default" src="/assets/brand.png" alt="" />
-              <img className="sidebar-logo-hover" src="/assets/sidebar-hover.png" alt="" />
+              <img className="sidebar-logo-default" src="/assets/synapse-logo.png" alt="" />
+              <img className="sidebar-logo-hover" src="/assets/synapse-hover.png" alt="" />
             </span>
             <span>Synapse</span>
           </button>
@@ -547,7 +633,9 @@ function App() {
 
         <nav className="sidebar-navigation" aria-label="Actions principales">
           <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { closeSidebarPanels(); newConversation() }}>
-            <img src="/assets/new-tab.png" alt="" />
+            <span className="sidebar-icon" aria-hidden="true">
+              <img src="/assets/new-tab.png" alt="" />
+            </span>
             <span>Nouvelle conversation</span>
           </button>
           <button
@@ -557,6 +645,7 @@ function App() {
             aria-label="Rechercher"
             onClick={() => {
               if (isSidebarOpen) {
+                setIsAccountMenuOpen(false)
                 setActiveView('chat')
                 setCollapsedPanel(null)
                 setIsFilterOpen((current) => !current)
@@ -567,29 +656,10 @@ function App() {
               }
             }}
           >
-            <img src="/assets/search.png" alt="" />
+            <span className="sidebar-icon" aria-hidden="true">
+              <img src="/assets/search.png" alt="" />
+            </span>
             <span>Rechercher</span>
-          </button>
-          <button
-            className={collapsedPanel === 'history' ? 'active' : ''}
-            type="button"
-            title="Discussions recentes"
-            aria-label="Discussions recentes"
-            onClick={() => {
-              setShowArchived(false)
-              if (isSidebarOpen) {
-                setActiveView('chat')
-                setCollapsedPanel(null)
-                setIsFilterOpen(false)
-                setOpenMenuId(null)
-              } else {
-                setIsFilterOpen(false)
-                toggleCollapsedPanel('history')
-              }
-            }}
-          >
-            <img src="/assets/message.png" alt="" />
-            <span>Discussions recentes</span>
           </button>
           <button
             className={isModelsView ? 'active' : ''}
@@ -598,12 +668,44 @@ function App() {
             aria-label="Explorer les modeles"
             onClick={() => {
               closeTransientMenus()
+              setIsAccountMenuOpen(false)
               setIsFilterOpen(false)
+              setIsAdvancedFiltersOpen(false)
               setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
             }}
           >
-            <img src="/assets/compass.png" alt="" />
+            <span className="sidebar-icon" aria-hidden="true">
+              <img src="/assets/compass.png" alt="" />
+            </span>
             <span>Explorer les modeles</span>
+          </button>
+          <button
+            className={`recent-nav-button ${collapsedPanel === 'history' ? 'active' : ''}`}
+            type="button"
+            title="Discussions recentes"
+            aria-label="Discussions recentes"
+            onClick={() => {
+              setShowArchived(false)
+              if (isSidebarOpen) {
+                setIsAccountMenuOpen(false)
+                setActiveView('chat')
+                setCollapsedPanel(null)
+                setIsFilterOpen(false)
+                setIsAdvancedFiltersOpen(false)
+                setModelFilter('')
+                setSearch('')
+                setOpenMenuId(null)
+              } else {
+                setIsAdvancedFiltersOpen(false)
+                setIsFilterOpen(true)
+                toggleCollapsedPanel('history')
+              }
+            }}
+          >
+            <span className="sidebar-icon" aria-hidden="true">
+              <img src="/assets/message.png" alt="" />
+            </span>
+            <span>Discussions recentes</span>
           </button>
         </nav>
 
@@ -611,22 +713,35 @@ function App() {
           <div className="history-heading">
             <span>{showArchived ? 'Archives' : 'Recents'}</span>
             {isSidebarOpen && (
-              <button type="button" aria-label="Filtres" onClick={() => setIsFilterOpen((current) => !current)}>
+              <button
+                type="button"
+                aria-label="Filtres"
+                onClick={() => {
+                  setIsFilterOpen((current) => {
+                    const next = !current
+                    setIsAdvancedFiltersOpen(next)
+                    return next
+                  })
+                }}
+              >
                 <img src="/assets/filter.png" alt="" />
               </button>
             )}
           </div>
 
           {isFilterOpen && (
-            <div className="filters compact">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
-              <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
-                <option value="">Tous les modeles</option>
-                {models.map((model) => (
-                  <option key={model.alias} value={model.alias}>{model.displayName}</option>
-                ))}
-              </select>
-            </div>
+            <SearchPanel
+              hideFilterButton
+              isAdvancedFiltersOpen={isAdvancedFiltersOpen}
+              modelFilter={modelFilter}
+              models={models}
+              search={search}
+              setIsAdvancedFiltersOpen={setIsAdvancedFiltersOpen}
+              setModelFilter={setModelFilter}
+              setSearch={setSearch}
+              setShowArchived={setShowArchived}
+              showArchived={showArchived}
+            />
           )}
 
           <HistoryList
@@ -637,6 +752,7 @@ function App() {
             loadConversations={loadConversations}
             openConversation={openConversation}
             openMenuId={openMenuId}
+            setIsAccountMenuOpen={setIsAccountMenuOpen}
             setOpenMenuId={setOpenMenuId}
             archiveConversation={archiveConversation}
             deleteConversation={deleteConversation}
@@ -645,8 +761,21 @@ function App() {
         </section>
 
         <div className="sidebar-user" data-menu-root>
-          <button type="button" title="Compte" aria-label="Compte" onClick={() => setIsAccountMenuOpen((current) => !current)}>
-            <span className="user-avatar">HA</span>
+          <button
+            type="button"
+            title="Compte"
+            aria-label="Compte"
+            onClick={() => {
+              setOpenMenuId(null)
+              setIsHeaderMenuOpen(false)
+              setIsModelMenuOpen(false)
+              setCollapsedPanel(null)
+              setIsAccountMenuOpen((current) => !current)
+            }}
+          >
+            <span className="user-avatar-wrapper">
+              <span className="user-avatar">HA</span>
+            </span>
             <span className="user-copy">
               <strong>Hind Alami</strong>
             </span>
@@ -679,23 +808,20 @@ function App() {
         <div className="collapsed-panel" data-menu-root>
           <div className="collapsed-panel-header">
             <strong>{collapsedPanel === 'history' ? 'Discussions recentes' : 'Rechercher'}</strong>
-            {collapsedPanel === 'search' && (
-              <button type="button" aria-label="Filtres" onClick={() => setIsFilterOpen((current) => !current)}>
-                <img src="/assets/filter.png" alt="" />
-              </button>
-            )}
           </div>
 
-          {collapsedPanel === 'search' && (
-            <div className="filters compact">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
-              <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
-                <option value="">Tous les modeles</option>
-                {models.map((model) => (
-                  <option key={model.alias} value={model.alias}>{model.displayName}</option>
-                ))}
-              </select>
-            </div>
+          {(collapsedPanel === 'search' || collapsedPanel === 'history') && (
+            <SearchPanel
+              isAdvancedFiltersOpen={isAdvancedFiltersOpen}
+              modelFilter={modelFilter}
+              models={models}
+              search={search}
+              setIsAdvancedFiltersOpen={setIsAdvancedFiltersOpen}
+              setModelFilter={setModelFilter}
+              setSearch={setSearch}
+              setShowArchived={setShowArchived}
+              showArchived={showArchived}
+            />
           )}
           <HistoryList
             activeConversation={activeConversation}
@@ -708,6 +834,7 @@ function App() {
               setCollapsedPanel(null)
             }}
             openMenuId={openMenuId}
+            setIsAccountMenuOpen={setIsAccountMenuOpen}
             setOpenMenuId={setOpenMenuId}
             archiveConversation={archiveConversation}
             deleteConversation={deleteConversation}
@@ -720,7 +847,15 @@ function App() {
         <header className="chat-header">
           <div className="header-controls">
             <div className="model-switcher" data-menu-root>
-              <button className="model-button" type="button" onClick={() => setIsModelMenuOpen((current) => !current)} disabled={isSending || isLoadingModels}>
+              <button
+                className="model-button"
+                type="button"
+                onClick={() => {
+                  setIsAccountMenuOpen(false)
+                  setIsModelMenuOpen((current) => !current)
+                }}
+                disabled={isSending || isLoadingModels}
+              >
                 <span>{activeModel?.displayName || 'Modele'}</span>
                 <span className="model-arrow" aria-hidden="true"></span>
               </button>
@@ -742,7 +877,10 @@ function App() {
                 isOpen={isHeaderMenuOpen}
                 onArchive={() => archiveConversation(activeConversation)}
                 onDelete={() => deleteConversation(activeConversation)}
-                onOpen={() => setIsHeaderMenuOpen((current) => !current)}
+                onOpen={() => {
+                  setIsAccountMenuOpen(false)
+                  setIsHeaderMenuOpen((current) => !current)
+                }}
                 onRename={() => renameConversation(activeConversation)}
               />
             )}
@@ -756,8 +894,8 @@ function App() {
                 <span>Catalogue</span>
                 <h2 id="model-gallery-title">Explorer les modeles</h2>
               </div>
-              <button type="button" aria-label="Fermer l explorateur" onClick={() => setActiveView('chat')}>
-                <span aria-hidden="true">x</span>
+              <button className="close-button" type="button" aria-label="Fermer l explorateur" onClick={() => setActiveView('chat')}>
+                <span className="close-icon" aria-hidden="true"></span>
               </button>
             </div>
 
@@ -803,30 +941,27 @@ function App() {
           onScroll={onMessagesScroll}
           aria-live="polite"
         >
-          {!hasActiveMessages && (
-            <div className="welcome-stack">
+          {(!hasActiveMessages || isComposerTransitioning) && (
+            <div className={`welcome-stack ${hasActiveMessages ? 'leaving' : ''}`}>
               <div className="empty-state">
-                <h2>Par quoi voulez-vous commencer ?</h2>
+                <h2>Comment puis-je vous aider ?</h2>
               </div>
-              <form className={`composer composer-welcome ${isComposerMaxed ? 'composer-maxed' : ''}`} onSubmit={sendMessage}>
-                <textarea
-                  ref={textareaRef}
-                  disabled={isSending}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Poser une question"
-                  rows={1}
-                  value={draft}
-                />
-                <button type="submit" aria-label="Envoyer" disabled={!canSend}>
-                  {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
-                </button>
-              </form>
             </div>
           )}
 
           {messages.map((item) => (
-            <MessageBubble key={item.id} message={item} fallbackModelName={activeModel?.displayName || modelDisplayName(activeModelAlias)} />
+            <MessageBubble
+              copiedKey={copiedKey}
+              fallbackModelName={activeModel?.displayName || modelDisplayName(activeModelAlias)}
+              key={item.id}
+              message={item}
+              onCopy={async (text) => {
+                const success = await copyToClipboard(text)
+                if (!success) showError('Impossible de copier le contenu.')
+                return success
+              }}
+              setCopiedKey={setCopiedKey}
+            />
           ))}
           <div ref={bottomRef} className="bottom-anchor" />
         </section>
@@ -837,26 +972,38 @@ function App() {
           </button>
         )}
 
-        {hasActiveMessages && (
-          <form className={`composer composer-bottom ${isComposerMaxed ? 'composer-maxed' : ''}`} onSubmit={sendMessage}>
-            <textarea
-              ref={textareaRef}
-              disabled={isSending}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Poser une question"
-              rows={1}
-              value={draft}
-            />
-            <button type="submit" aria-label="Envoyer" disabled={!canSend}>
-              {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
-            </button>
-          </form>
-        )}
+        <form
+          ref={composerRef}
+          className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-welcome composer-center'} ${isComposerMaxed ? 'composer-maxed' : ''}`}
+          onSubmit={sendMessage}
+        >
+          <textarea
+            ref={textareaRef}
+            disabled={isSending}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Poser une question"
+            rows={1}
+            value={draft}
+          />
+          <button type="submit" aria-label="Envoyer" disabled={!canSend}>
+            {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
+          </button>
+        </form>
 
-        {chatError && (
-          <div className="inline-error" role="alert">
-            {chatError}
+        {(chatError || chatNotice) && (
+          <div className={`inline-error ${chatNotice ? 'success' : ''}`} role={chatError ? 'alert' : 'status'}>
+            <span>{chatError || chatNotice}</span>
+            <button
+              type="button"
+              aria-label="Fermer la notification"
+              onClick={() => {
+                setChatError('')
+                setChatNotice('')
+              }}
+            >
+              <span className="close-icon" aria-hidden="true"></span>
+            </button>
           </div>
         )}
       </main>
@@ -885,15 +1032,24 @@ function App() {
 }
 
 function ConversationMenu({ id, isOpen, onOpen, onRename, onArchive, onDelete }) {
+  const [placement, setPlacement] = useState('bottom')
+
+  function handleOpen(event) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const estimatedMenuHeight = 126
+    setPlacement(window.innerHeight - rect.bottom < estimatedMenuHeight ? 'top' : 'bottom')
+    onOpen()
+  }
+
   return (
-    <div className="conversation-menu" data-menu-root>
+    <div className={`conversation-menu menu-${placement}`} data-menu-root>
       <button
         className="icon-button"
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={`${id}-menu`}
-        onClick={onOpen}
+        onClick={handleOpen}
       >
         <DotsIcon />
       </button>
@@ -916,6 +1072,7 @@ function HistoryList({
   loadConversations,
   openConversation,
   openMenuId,
+  setIsAccountMenuOpen,
   setOpenMenuId,
   archiveConversation,
   deleteConversation,
@@ -944,13 +1101,57 @@ function HistoryList({
               isOpen={openMenuId === conversation.id}
               onArchive={() => archiveConversation(conversation)}
               onDelete={() => deleteConversation(conversation)}
-              onOpen={() => setOpenMenuId((current) => (current === conversation.id ? null : conversation.id))}
+              onOpen={() => {
+                setIsAccountMenuOpen(false)
+                setOpenMenuId((current) => (current === conversation.id ? null : conversation.id))
+              }}
               onRename={() => renameConversation(conversation)}
             />
           </div>
         ))}
       </div>
     </>
+  )
+}
+
+function SearchPanel({
+  hideFilterButton = false,
+  isAdvancedFiltersOpen,
+  modelFilter,
+  models,
+  search,
+  setIsAdvancedFiltersOpen,
+  setModelFilter,
+  setSearch,
+  setShowArchived,
+  showArchived,
+}) {
+  return (
+    <div className="search-panel">
+      <div className={`search-line ${hideFilterButton ? 'without-filter-button' : ''}`}>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
+        {!hideFilterButton && (
+          <button type="button" aria-label="Afficher les filtres avances" onClick={() => setIsAdvancedFiltersOpen((current) => !current)}>
+            <img src="/assets/filter.png" alt="" />
+          </button>
+        )}
+      </div>
+
+      {isAdvancedFiltersOpen && (
+        <div className="advanced-filters">
+          <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
+            <option value="">Tous les modeles</option>
+            {models.map((model) => (
+              <option key={model.alias} value={model.alias}>{model.displayName}</option>
+            ))}
+          </select>
+          <label>
+            <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+            <span>Archives</span>
+          </label>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -968,9 +1169,43 @@ function DownArrowIcon() {
   return <span className="down-arrow-icon" aria-hidden="true"></span>
 }
 
-function MessageBubble({ message, fallbackModelName }) {
+async function deletionErrorMessage(response) {
+  if (response.status === 404) return 'Conversation introuvable ou deja supprimee.'
+  if (response.status === 409) return 'Cette conversation ne peut pas etre supprimee pour le moment.'
+  if (response.status >= 500) return 'Suppression impossible cote serveur. Verifiez les liens messages/conversation.'
+  return requestStatusMessage(response, 'Impossible de supprimer la conversation.')
+}
+
+async function requestStatusMessage(response, fallback) {
+  let details
+  try {
+    details = await response.text()
+  } catch {
+    details = ''
+  }
+  return details?.trim() || `${fallback} Statut HTTP ${response.status}.`
+}
+
+function requestErrorMessage(error, fallback) {
+  if (error instanceof TypeError && /fetch/i.test(error.message)) {
+    return `${fallback} Le backend est inaccessible ou la requete est bloquee par CORS.`
+  }
+  return error instanceof Error ? error.message : fallback
+}
+
+function MessageBubble({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
   const isUser = message.role === 'USER'
   const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, message.modelAlias)
+  const isWaiting = !isUser && message.status === 'EN_COURS' && !message.content
+  const messageCopyKey = `message-${message.id}`
+
+  async function copyResponse() {
+    const success = await onCopy(message.content || '')
+    if (!success) return
+    setCopiedKey(messageCopyKey)
+    window.setTimeout(() => setCopiedKey((current) => (current === messageCopyKey ? '' : current)), 1500)
+  }
+
   return (
     <article className={`message ${isUser ? 'user' : 'assistant'}`}>
       <div className="bubble">
@@ -981,22 +1216,123 @@ function MessageBubble({ message, fallbackModelName }) {
         )}
         {isUser ? (
           <p>{message.content}</p>
+        ) : isWaiting ? (
+          <TypingIndicator />
         ) : (
-          <MarkdownContent content={message.content || (message.status === 'EN_COURS' ? '...' : '')} />
+          <>
+            <MarkdownContent content={message.content || ''} copiedKey={copiedKey} onCopy={onCopy} setCopiedKey={setCopiedKey} />
+            {message.content && (
+              <div className="message-actions">
+                <button type="button" aria-label="Copier la reponse" onClick={copyResponse}>
+                  {copiedKey === messageCopyKey ? <span>Copie</span> : <CopyIcon />}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </article>
   )
 }
 
-function MarkdownContent({ content }) {
+function MarkdownContent({ content, copiedKey, onCopy, setCopiedKey }) {
   return (
     <div className="markdown-body">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+      <ReactMarkdown
+        components={{
+          code({ children, className, ...props }) {
+            return <code className={className} {...props}>{children}</code>
+          },
+          pre({ children }) {
+            const child = Array.isArray(children) ? children[0] : children
+            const props = child?.props || {}
+            const className = props.className || ''
+            const match = /language-(\w+)/.exec(className)
+            const code = String(props.children || '').replace(/\n$/, '')
+            return (
+              <CodeBlock
+                code={code}
+                copiedKey={copiedKey}
+                language={match?.[1] || 'code'}
+                onCopy={onCopy}
+                setCopiedKey={setCopiedKey}
+              />
+            )
+          },
+        }}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSanitize]}
+      >
         {content}
       </ReactMarkdown>
     </div>
   )
+}
+
+function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
+  const copyKey = `code-${hashText(`${language}:${code}`)}`
+
+  async function copyCode() {
+    const success = await onCopy(code)
+    if (!success) return
+    setCopiedKey(copyKey)
+    window.setTimeout(() => setCopiedKey((current) => (current === copyKey ? '' : current)), 1500)
+  }
+
+  return (
+    <div className="code-block">
+      <div className="code-block-header">
+        <span>{language || 'code'}</span>
+        <button type="button" aria-label="Copier le code" onClick={copyCode}>
+          {copiedKey === copyKey ? 'Copie' : <CopyIcon />}
+        </button>
+      </div>
+      <pre><code>{code}</code></pre>
+    </div>
+  )
+}
+
+function TypingIndicator() {
+  return (
+    <div className="typing-indicator" aria-label="Reponse en cours">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <span className="copy-icon" aria-hidden="true">
+      <span></span>
+    </span>
+  )
+}
+
+async function copyToClipboard(text) {
+  if (!text) return false
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch (error) {
+    logDevelopmentError('clipboard failed', error)
+    return false
+  }
+}
+
+function hashText(value) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
+  }
+  return Math.abs(hash).toString(36)
+}
+
+function logDevelopmentError(label, payload) {
+  if (import.meta.env.DEV) {
+    console.error(label, payload)
+  }
 }
 
 function parseJson(value) {
@@ -1021,7 +1357,7 @@ function cleanModelName(value, alias) {
   return candidate
     .replace(/^secure[-_\s]*model[-_\s]*/i, '')
     .replace(/^secure[-_\s]*/i, '')
-    .replace(/\bGrok\b/g, 'Groq')
+    .replace(/\bGro[kq]\b/g, 'Groq')
     .trim()
 }
 

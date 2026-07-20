@@ -130,8 +130,15 @@ public class ConversationService {
     @Transactional
     public void deletePermanent(Long id) {
         Conversation conversation = ownedConversation(id);
-        messageRepository.deleteByConversation(conversation);
-        conversationRepository.delete(conversation);
+        Long conversationId = id;
+        Utilisateur user = conversation.getUtilisateur();
+        messageRepository.clearResponseLinksByConversationId(conversationId);
+        messageRepository.deleteAllByConversationId(conversationId);
+        messageRepository.flush();
+        int deleted = conversationRepository.deleteOwnedById(conversationId, user);
+        if (deleted == 0) {
+            throw new ResponseStatusException(NOT_FOUND, "Conversation not found");
+        }
     }
 
     @Transactional(readOnly = true)

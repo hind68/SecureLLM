@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -149,6 +152,46 @@ class ConversationServiceTest {
         assertThatThrownBy(() -> service.changeModel(10L, new ChangeConversationModelRequest("inactive")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Unknown or inactive model");
+    }
+
+    @Test
+    void deletePermanentRemovesMessagesBeforeConversation() {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.deleteOwnedById(10L, demoUser)).thenReturn(1);
+
+        service.deletePermanent(10L);
+
+        InOrder order = inOrder(messageRepository, conversationRepository);
+        order.verify(messageRepository).clearResponseLinksByConversationId(10L);
+        order.verify(messageRepository).deleteAllByConversationId(10L);
+        order.verify(messageRepository).flush();
+        order.verify(conversationRepository).deleteOwnedById(10L, demoUser);
+    }
+
+    @Test
+    void deletePermanentRejectsUnknownConversationWithoutDeletingMessages() {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(99L, demoUser)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deletePermanent(99L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Conversation not found");
+
+        verify(messageRepository, never()).deleteAllByConversationId(99L);
+        verify(conversationRepository, never()).deleteOwnedById(99L, demoUser);
+    }
+
+    @Test
+    void archiveOnlyChangesConversationStatus() {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+
+        service.archive(10L);
+
+        assertThat(conversation.getStatut()).isEqualTo(com.example.backend.entity.StatutConversation.ARCHIVEE);
+        verify(messageRepository, never()).deleteAllByConversationId(10L);
+        verify(conversationRepository, never()).deleteOwnedById(10L, demoUser);
     }
 
     @Test
