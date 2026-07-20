@@ -23,8 +23,7 @@ function App() {
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false')
-  const [showModelsExplorer, setShowModelsExplorer] = useState(false)
-  const [isModelGalleryOpen, setIsModelGalleryOpen] = useState(false)
+  const [activeView, setActiveView] = useState('chat')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [collapsedPanel, setCollapsedPanel] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -46,6 +45,7 @@ function App() {
   const activeModel = models.find((model) => model.alias === activeModelAlias)
   const canSend = Boolean(activeModelAlias && draft.trim() && !isSending)
   const hasActiveMessages = messages.length > 0
+  const isModelsView = activeView === 'models'
 
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current
@@ -84,9 +84,8 @@ function App() {
 
   const closeSidebarPanels = useCallback(() => {
     closeTransientMenus()
-    setShowModelsExplorer(false)
     setIsFilterOpen(false)
-    setIsModelGalleryOpen(false)
+    setActiveView('chat')
   }, [closeTransientMenus])
 
   const loadModels = useCallback(async () => {
@@ -165,7 +164,7 @@ function App() {
       if (event.key === 'Escape') {
         closeTransientMenus()
         setModelDecision(null)
-        setIsModelGalleryOpen(false)
+        setActiveView('chat')
       }
     }
 
@@ -489,8 +488,6 @@ function App() {
     setIsHeaderMenuOpen(false)
     setIsModelMenuOpen(false)
     setIsAccountMenuOpen(false)
-    setShowModelsExplorer(false)
-    setIsModelGalleryOpen(false)
     if (panel !== 'search') {
       setIsFilterOpen(false)
     }
@@ -554,13 +551,13 @@ function App() {
             <span>Nouvelle conversation</span>
           </button>
           <button
+            className={isFilterOpen || collapsedPanel === 'search' ? 'active' : ''}
             type="button"
             title="Rechercher"
             aria-label="Rechercher"
             onClick={() => {
               if (isSidebarOpen) {
-                setShowModelsExplorer(false)
-                setIsModelGalleryOpen(false)
+                setActiveView('chat')
                 setCollapsedPanel(null)
                 setIsFilterOpen((current) => !current)
               } else {
@@ -574,15 +571,15 @@ function App() {
             <span>Rechercher</span>
           </button>
           <button
+            className={collapsedPanel === 'history' ? 'active' : ''}
             type="button"
             title="Discussions recentes"
             aria-label="Discussions recentes"
             onClick={() => {
               setShowArchived(false)
               if (isSidebarOpen) {
+                setActiveView('chat')
                 setCollapsedPanel(null)
-                setShowModelsExplorer(false)
-                setIsModelGalleryOpen(false)
                 setIsFilterOpen(false)
                 setOpenMenuId(null)
               } else {
@@ -595,38 +592,20 @@ function App() {
             <span>Discussions recentes</span>
           </button>
           <button
+            className={isModelsView ? 'active' : ''}
             type="button"
             title="Explorer les modeles"
             aria-label="Explorer les modeles"
             onClick={() => {
-              if (isSidebarOpen) {
-                setCollapsedPanel(null)
-                setIsFilterOpen(false)
-                setShowModelsExplorer((current) => !current)
-              } else {
-                setIsFilterOpen(false)
-                toggleCollapsedPanel('models')
-              }
+              closeTransientMenus()
+              setIsFilterOpen(false)
+              setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
             }}
           >
             <img src="/assets/compass.png" alt="" />
             <span>Explorer les modeles</span>
           </button>
         </nav>
-
-        {isSidebarOpen && showModelsExplorer && (
-          <div className="models-panel">
-            <button className="models-panel-all" type="button" onClick={() => setIsModelGalleryOpen(true)}>
-              Voir tous les modeles
-            </button>
-            {models.map((model) => (
-              <button key={model.alias} type="button" onClick={() => selectModel(model.alias)} disabled={isSending}>
-                <strong>{model.displayName}</strong>
-                <span>{modelProviderName(model.alias)}</span>
-              </button>
-            ))}
-          </div>
-        )}
 
         <section className="recent-section">
           <div className="history-heading">
@@ -699,71 +678,41 @@ function App() {
       {!isSidebarOpen && collapsedPanel && (
         <div className="collapsed-panel" data-menu-root>
           <div className="collapsed-panel-header">
-            <strong>
-              {collapsedPanel === 'models'
-                ? 'Modeles'
-                : collapsedPanel === 'search'
-                  ? 'Rechercher'
-                  : 'Discussions recentes'}
-            </strong>
-            {collapsedPanel !== 'models' && (
+            <strong>{collapsedPanel === 'history' ? 'Discussions recentes' : 'Rechercher'}</strong>
+            {collapsedPanel === 'search' && (
               <button type="button" aria-label="Filtres" onClick={() => setIsFilterOpen((current) => !current)}>
                 <img src="/assets/filter.png" alt="" />
               </button>
             )}
           </div>
 
-          {collapsedPanel === 'models' ? (
-            <div className="collapsed-model-list">
-              <button className="collapsed-model-gallery" type="button" onClick={() => { setIsModelGalleryOpen(true); setCollapsedPanel(null) }}>
-                Voir tous les modeles
-              </button>
-              {models.map((model) => (
-                <button
-                  key={model.alias}
-                  type="button"
-                  onClick={() => {
-                    selectModel(model.alias)
-                    setCollapsedPanel(null)
-                  }}
-                  disabled={isSending}
-                >
-                  <strong>{model.displayName}</strong>
-                  <span>{modelProviderName(model.alias)}</span>
-                </button>
-              ))}
+          {collapsedPanel === 'search' && (
+            <div className="filters compact">
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
+              <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
+                <option value="">Tous les modeles</option>
+                {models.map((model) => (
+                  <option key={model.alias} value={model.alias}>{model.displayName}</option>
+                ))}
+              </select>
             </div>
-          ) : (
-            <>
-              {(collapsedPanel === 'search' || isFilterOpen) && (
-                <div className="filters compact">
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
-                  <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
-                    <option value="">Tous les modeles</option>
-                    {models.map((model) => (
-                      <option key={model.alias} value={model.alias}>{model.displayName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <HistoryList
-                activeConversation={activeConversation}
-                conversations={conversations}
-                historyError={historyError}
-                isLoadingHistory={isLoadingHistory}
-                loadConversations={loadConversations}
-                openConversation={async (conversation) => {
-                  await openConversation(conversation)
-                  setCollapsedPanel(null)
-                }}
-                openMenuId={openMenuId}
-                setOpenMenuId={setOpenMenuId}
-                archiveConversation={archiveConversation}
-                deleteConversation={deleteConversation}
-                renameConversation={renameConversation}
-              />
-            </>
           )}
+          <HistoryList
+            activeConversation={activeConversation}
+            conversations={conversations}
+            historyError={historyError}
+            isLoadingHistory={isLoadingHistory}
+            loadConversations={loadConversations}
+            openConversation={async (conversation) => {
+              await openConversation(conversation)
+              setCollapsedPanel(null)
+            }}
+            openMenuId={openMenuId}
+            setOpenMenuId={setOpenMenuId}
+            archiveConversation={archiveConversation}
+            deleteConversation={deleteConversation}
+            renameConversation={renameConversation}
+          />
         </div>
       )}
 
@@ -800,14 +749,14 @@ function App() {
           </div>
         </header>
 
-        {isModelGalleryOpen && (
+        {isModelsView && (
           <section className="model-gallery" aria-labelledby="model-gallery-title" data-menu-root>
             <div className="model-gallery-header">
               <div>
                 <span>Catalogue</span>
                 <h2 id="model-gallery-title">Explorer les modeles</h2>
               </div>
-              <button type="button" aria-label="Fermer l explorateur" onClick={() => setIsModelGalleryOpen(false)}>
+              <button type="button" aria-label="Fermer l explorateur" onClick={() => setActiveView('chat')}>
                 <span aria-hidden="true">x</span>
               </button>
             </div>
@@ -818,7 +767,11 @@ function App() {
                 return (
                   <article className="model-card" key={model.alias}>
                     <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
-                      <span>{meta.initials}</span>
+                      {meta.logo ? (
+                        <img src={meta.logo} alt="" />
+                      ) : (
+                        <span>{meta.initials}</span>
+                      )}
                     </div>
                     <div className="model-card-copy">
                       <div className="model-card-topline">
@@ -831,7 +784,7 @@ function App() {
                       type="button"
                       onClick={() => {
                         selectModel(model.alias)
-                        setIsModelGalleryOpen(false)
+                        setActiveView('chat')
                       }}
                       disabled={isSending}
                     >
@@ -1068,6 +1021,7 @@ function cleanModelName(value, alias) {
   return candidate
     .replace(/^secure[-_\s]*model[-_\s]*/i, '')
     .replace(/^secure[-_\s]*/i, '')
+    .replace(/\bGrok\b/g, 'Groq')
     .trim()
 }
 
@@ -1086,21 +1040,25 @@ function modelCardMeta(alias) {
   const metas = {
     'secure-gpt': {
       initials: 'GPT',
+      logo: '/assets/openai-logo.png',
       tone: 'tone-openai',
       description: 'Modele generaliste adapte aux reponses concises, au raisonnement et aux usages quotidiens.',
     },
     'secure-groq': {
       initials: 'GQ',
+      logo: '/assets/grok-logo.png',
       tone: 'tone-groq',
       description: 'Modele rapide pour tester les conversations et obtenir des reponses reactives.',
     },
     'secure-gemini': {
       initials: 'GM',
+      logo: '/assets/gemini-logo.png',
       tone: 'tone-gemini',
       description: 'Modele polyvalent pour explorer, reformuler et structurer des idees.',
     },
     'secure-mistral': {
       initials: 'MS',
+      logo: '/assets/mistral-logo.png',
       tone: 'tone-mistral',
       description: 'Modele efficace pour les taches pratiques, les syntheses et les prompts directs.',
     },
