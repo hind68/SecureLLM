@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import ReactMarkdown from 'react-markdown'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
+import c from 'react-syntax-highlighter/dist/esm/languages/prism/c'
 import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
 import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
@@ -19,8 +20,10 @@ import './App.css'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 const SIDEBAR_STORAGE_KEY = 'secure-llm-sidebar-open'
+const LAST_MODEL_STORAGE_KEY = 'secure-llm-last-model'
 
 SyntaxHighlighter.registerLanguage('bash', bash)
+SyntaxHighlighter.registerLanguage('c', c)
 SyntaxHighlighter.registerLanguage('css', css)
 SyntaxHighlighter.registerLanguage('java', java)
 SyntaxHighlighter.registerLanguage('javascript', javascript)
@@ -38,7 +41,7 @@ SyntaxHighlighter.registerLanguage('yml', yaml)
 
 function App() {
   const [models, setModels] = useState([])
-  const [selectedModel, setSelectedModel] = useState('')
+  const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem(LAST_MODEL_STORAGE_KEY) || '')
   const [modelFilter, setModelFilter] = useState('')
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -145,7 +148,7 @@ function App() {
         ? data.map((item) => ({ alias: item.alias, displayName: cleanModelName(item.displayName || item.alias, item.alias) }))
         : []
       setModels(normalized)
-      setSelectedModel((current) => current || normalized[0]?.alias || '')
+      setSelectedModel((current) => selectAvailableModel(normalized, current))
       setChatError('')
     } catch {
       try {
@@ -156,7 +159,7 @@ function App() {
           ? aliases.map((alias) => ({ alias, displayName: cleanModelName(alias, alias) }))
           : []
         setModels(normalized)
-        setSelectedModel((current) => current || normalized[0]?.alias || '')
+        setSelectedModel((current) => selectAvailableModel(normalized, current))
         setChatError('')
       } catch {
         showError('Impossible de charger les modeles.')
@@ -199,6 +202,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(isSidebarOpen))
   }, [isSidebarOpen])
+
+  useEffect(() => {
+    if (!selectedModel || !models.some((model) => model.alias === selectedModel)) return
+    saveLastModel(selectedModel)
+  }, [models, selectedModel])
 
   useEffect(() => {
     function closeMenus(event) {
@@ -290,6 +298,7 @@ function App() {
       closeTransientMenus()
       setActiveConversation(conversation)
       setSelectedModel(conversation.modelAlias)
+      saveLastModel(conversation.modelAlias)
       setIsLastBlockVisible(true)
       shouldAutoScrollRef.current = true
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages`)
@@ -309,6 +318,7 @@ function App() {
     setChatError('')
     closeTransientMenus()
     setSelectedModel(modelAlias)
+    saveLastModel(modelAlias)
     setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
     closeSidePanelOnMobile()
@@ -324,6 +334,7 @@ function App() {
     const conversation = await response.json()
     setActiveConversation(conversation)
     setSelectedModel(conversation.modelAlias)
+    saveLastModel(conversation.modelAlias)
     setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
     return conversation
   }
@@ -532,6 +543,7 @@ function App() {
     if (isSending) return
     if (!activeConversation) {
       setSelectedModel(alias)
+      saveLastModel(alias)
       return
     }
     if (activeConversation.modelAlias === alias) return
@@ -550,6 +562,7 @@ function App() {
       const updated = await response.json()
       setActiveConversation(updated)
       setSelectedModel(updated.modelAlias)
+      saveLastModel(updated.modelAlias)
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setModelDecision(null)
     } catch (error) {
@@ -1289,6 +1302,8 @@ function AssistantMessageHeader({ modelAlias, modelName }) {
 }
 
 function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }) {
+  const normalizedContent = normalizeMarkdownCodeFences(content)
+
   return (
     <div className="markdown-body" dir={direction}>
       <ReactMarkdown
@@ -1302,11 +1317,12 @@ function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }
             const className = props.className || ''
             const match = /language-([^\s]+)/.exec(className)
             const code = String(props.children || '').replace(/\n$/, '')
+            const language = normalizeCodeLanguage(match?.[1] || 'text')
             return (
               <CodeBlock
                 code={code}
                 copiedKey={copiedKey}
-                language={match?.[1] || 'code'}
+                language={language}
                 onCopy={onCopy}
                 setCopiedKey={setCopiedKey}
               />
@@ -1316,14 +1332,15 @@ function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   )
 }
 
 function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
-  const copyKey = `code-${hashText(`${language}:${code}`)}`
+  const normalizedLanguage = normalizeCodeLanguage(language)
+  const copyKey = `code-${hashText(`${normalizedLanguage}:${code}`)}`
 
   async function copyCode() {
     const success = await onCopy(code)
@@ -1334,7 +1351,7 @@ function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
   return (
     <div className="code-block">
       <div className="code-block-header">
-        <span>{formatLanguageName(language)}</span>
+        <span>{formatLanguageName(normalizedLanguage)}</span>
         <button type="button" aria-label="Copier le code" onClick={copyCode}>
           {copiedKey === copyKey ? 'Copie' : <CopyIcon tone="light" />}
         </button>
@@ -1347,7 +1364,7 @@ function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
           margin: 0,
           padding: '15px 16px',
         }}
-        language={language === 'code' ? 'text' : language}
+        language={normalizedLanguage}
         style={vscDarkPlus}
         wrapLongLines={false}
       >
@@ -1381,17 +1398,16 @@ function CopyIcon({ tone = 'dark' }) {
   return <img className="copy-icon" src={src} alt="" aria-hidden="true" />
 }
 
-function ModelLogo({ alias, className = '', fallback }) {
-  const [canShowLogo, setCanShowLogo] = useState(Boolean(modelLogoSrc(alias)))
+function ModelLogo({ alias, className = '' }) {
   const logo = modelLogoSrc(alias)
 
-  if (!logo || !canShowLogo) {
-    return <span className={className}>{fallback}</span>
+  if (!logo) {
+    return null
   }
 
   return (
     <span className={className}>
-      <img src={logo} alt="" onError={() => setCanShowLogo(false)} />
+      <img src={logo} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} />
     </span>
   )
 }
@@ -1426,11 +1442,52 @@ function detectTextDirection(text) {
   return rtlMatches.length > ltrMatches.length ? 'rtl' : 'ltr'
 }
 
+function normalizeMarkdownCodeFences(content) {
+  return String(content || '').replace(/^```([^\s`]+)(.*)$/gm, (line, rawLanguage, rest) => {
+    const language = String(rawLanguage || '').trim()
+    const normalized = normalizeCodeLanguage(language)
+    if (normalized === 'c' && /^c#/i.test(language)) {
+      return `\`\`\`c\n${language.slice(1)}${rest || ''}`.trimEnd()
+    }
+    if (normalized !== 'text' && normalized !== language.toLowerCase()) {
+      return `\`\`\`${normalized}${rest || ''}`
+    }
+    return line
+  })
+}
+
+function normalizeCodeLanguage(language) {
+  const value = String(language || '').trim().toLowerCase()
+  if (!value || value === 'code' || value === 'text') return 'text'
+  if (value === 'c' || value === 'c99' || value === 'c11' || value.startsWith('c#')) return 'c'
+
+  const supported = new Set([
+    'bash',
+    'css',
+    'java',
+    'javascript',
+    'js',
+    'json',
+    'jsx',
+    'markdown',
+    'md',
+    'powershell',
+    'ps1',
+    'python',
+    'sql',
+    'yaml',
+    'yml',
+  ])
+
+  return supported.has(value) ? value : 'text'
+}
+
 function formatLanguageName(language) {
+  const normalized = normalizeCodeLanguage(language)
   const names = {
     bash: 'Bash',
+    c: 'C',
     css: 'CSS',
-    html: 'HTML',
     java: 'Java',
     javascript: 'JavaScript',
     js: 'JavaScript',
@@ -1442,23 +1499,20 @@ function formatLanguageName(language) {
     ps1: 'PowerShell',
     python: 'Python',
     sql: 'SQL',
-    text: 'Texte',
-    ts: 'TypeScript',
-    tsx: 'TSX',
-    typescript: 'TypeScript',
+    text: 'Code',
     yaml: 'YAML',
     yml: 'YAML',
   }
-  return names[language?.toLowerCase?.()] || language || 'Code'
+  return names[normalized] || 'Code'
 }
 
 function modelLogoSrc(alias) {
   const logos = {
-    'secure-gpt': '/assets/openai-logo.png',
-    'secure-groq': '/assets/groq-logo.png',
-    'secure-gemini': '/assets/gemini-logo.png',
-    'secure-mistral': '/assets/mistral-logo.png',
-    'secure-claude': '/assets/claude-logo.png',
+    'secure-gpt': '/assets/ChatGPT Logo.png',
+    'secure-groq': '/assets/groq logo.png',
+    'secure-gemini': '/assets/gemini logo.png',
+    'secure-mistral': '/assets/mistral logo.png',
+    'secure-claude': '/assets/claude logo.png',
   }
   return logos[alias] || ''
 }
@@ -1475,6 +1529,19 @@ function parseJson(value) {
   } catch {
     return null
   }
+}
+
+function saveLastModel(alias) {
+  if (!alias) return
+  localStorage.setItem(LAST_MODEL_STORAGE_KEY, alias)
+}
+
+function selectAvailableModel(models, currentAlias) {
+  const savedAlias = localStorage.getItem(LAST_MODEL_STORAGE_KEY)
+  if (savedAlias && models.some((model) => model.alias === savedAlias)) return savedAlias
+  if (savedAlias) localStorage.removeItem(LAST_MODEL_STORAGE_KEY)
+  if (currentAlias && models.some((model) => model.alias === currentAlias)) return currentAlias
+  return models[0]?.alias || ''
 }
 
 function cleanModelName(value, alias) {
