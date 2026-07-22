@@ -1,453 +1,326 @@
 # Secure LLM Gateway
 
-Secure LLM Gateway is an academic/internship project for designing a controlled gateway for using Large Language Models in a banking environment.
+Secure LLM Gateway is a local proof of concept for routing chat requests through a controlled backend before calling LLM providers through LiteLLM.
 
-## Current Phase
+The current project contains:
 
-Phase 1 is a LiteLLM proof of concept:
+- a LiteLLM proxy running with Docker Compose;
+- a PostgreSQL database running with Docker Compose;
+- a Spring Boot backend in `backend/`;
+- a React/Vite frontend in `frontend/`;
+- Flyway migrations for the model catalog, conversations and messages.
+
+No real secret must be committed. Local secrets belong only in `.env`.
+
+## Architecture
 
 ```text
-Postman / curl -> LiteLLM Proxy -> OpenAI, Groq, Gemini, or Mistral provider -> Response
+React frontend
+      |
+      v
+Spring Boot backend
+      |
+      +--> PostgreSQL: model catalog, conversations, messages
+      |
+      v
+LiteLLM proxy
+      |
+      v
+OpenAI / Groq / Gemini / Mistral
 ```
 
-The goal is to prove that the team can call multiple LLM providers through LiteLLM using a shared local Docker setup.
+Default local URLs:
 
-## LiteLLM Providers
-
-The current LiteLLM configuration exposes active aliases for OpenAI, Groq, Gemini, and Mistral, plus a commented optional alias for Claude:
-
-| Alias | Provider | Provider model |
-| --- | --- | --- |
-| `secure-gpt` | OpenAI | `openai/gpt-4o-mini` |
-| `secure-groq` | Groq | `groq/llama-3.1-8b-instant` |
-| `secure-gemini` | Google Gemini | `gemini/gemini-2.5-flash` |
-| `secure-claude` | Anthropic Claude | `anthropic/claude-3-5-sonnet-20241022` |
-| `secure-mistral` | Mistral | `mistral/mistral-small-latest` |
-
-`secure-claude` is still commented in `litellm/config.yaml`. Uncomment it only after adding `ANTHROPIC_API_KEY` to `.env`.
-
-To choose a provider, change only the `model` field in the request body.
-
-OpenAI example:
-
-```json
-{
-  "model": "secure-gpt",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Bonjour"
-    }
-  ]
-}
-```
-
-Groq example:
-
-```json
-{
-  "model": "secure-groq",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Bonjour"
-    }
-  ]
-}
-```
-
-Gemini example:
-
-```json
-{
-  "model": "secure-gemini",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Bonjour"
-    }
-  ]
-}
-```
-
-Mistral example:
-
-```json
-{
-  "model": "secure-mistral",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Bonjour"
-    }
-  ]
-}
-```
-
-## Planned Architecture
-
-Future phases will expand the gateway with:
-
-- React frontend
-- More Spring Boot backend features
-- LiteLLM orchestration/proxy layer
-- More PostgreSQL-backed domain tables
-- Authentication and roles
-- Prompt analysis
-- Sensitive data masking/blocking
-- Audit logs and request history
-
-This repository currently contains a first minimal Spring Boot backend plus placeholders for the frontend and database.
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:5173` |
+| Backend API | `http://localhost:8080/api` |
+| LiteLLM | `http://localhost:4000` |
+| PostgreSQL from host | `localhost:5433` |
+| PostgreSQL from Docker network | `postgres:5432` |
 
 ## Prerequisites
 
 - Git
 - Docker Desktop
-- An OpenAI API key for `secure-gpt`
-- A Groq API key for `secure-groq`
-- A Gemini API key for `secure-gemini`
-- A Mistral API key for `secure-mistral`
-- Optional: an Anthropic API key if `secure-claude` is enabled
+- Java 17
+- Node.js and npm
+- At least one provider API key for the model you want to test
 
-## Setup
+Provider keys used by the current LiteLLM config:
 
-1. Clone the repository.
-2. Copy `.env.example` to `.env`.
-3. Put your local Docker/PostgreSQL values and provider API keys in `.env`:
+| Alias | Display name | Provider model | Required key |
+| --- | --- | --- | --- |
+| `secure-gpt` | OpenAI GPT-4o mini | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
+| `secure-groq` | Groq Llama 3.1 8B | `groq/llama-3.1-8b-instant` | `GROQ_API_KEY` |
+| `secure-gemini` | Gemini 2.5 Flash | `gemini/gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `secure-mistral` | Mistral Small | `mistral/mistral-small-latest` | `MISTRAL_API_KEY` |
 
-   ```env
-   OPENAI_API_KEY=sk-your-real-key
-   GROQ_API_KEY=gsk-your-real-key
-   GEMINI_API_KEY=your-gemini-key
-   ANTHROPIC_API_KEY=your-anthropic-key
-   MISTRAL_API_KEY=your-mistral-key
-   LITELLM_MASTER_KEY=sk-local-litellm
-   LITELLM_PORT=4000
+`secure-claude` is prepared in `litellm/config.yaml` but is commented. Enable it only after adding `ANTHROPIC_API_KEY`.
 
-   POSTGRES_DB=secure_llm_gateway
-   POSTGRES_USER=secure_llm_user
-   POSTGRES_PASSWORD=change_me_local_only
-   POSTGRES_HOST_PORT=5433
+## 1. Configure Environment
 
-   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/secure_llm_gateway
-   SPRING_DATASOURCE_USERNAME=secure_llm_user
-   SPRING_DATASOURCE_PASSWORD=change_me_local_only
-   ```
+From the project root:
 
-4. Start PostgreSQL and LiteLLM:
-
-   ```bash
-   docker compose up -d postgres litellm
-   ```
-
-5. Check PostgreSQL health:
-
-   ```bash
-   docker compose ps postgres
-   ```
-
-On a new database, Flyway runs automatically when the Spring Boot backend starts. It creates the model catalog, then the conversation tables, and inserts the active LiteLLM aliases from `litellm/config.yaml` plus a local demo user.
-
-6. Test LiteLLM with curl:
-
-   ```bash
-   curl -X POST http://localhost:4000/v1/chat/completions \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer sk-local-litellm" \
-     -d @litellm/examples/request-openai.json
-   ```
-
-   To test Groq instead:
-
-   ```bash
-   curl -X POST http://localhost:4000/v1/chat/completions \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer sk-local-litellm" \
-     -d @litellm/examples/request-groq.json
-   ```
-
-   On Windows PowerShell:
-
-   ```powershell
-   curl.exe -X POST http://localhost:4000/v1/chat/completions `
-     -H "Content-Type: application/json" `
-     -H "Authorization: Bearer sk-local-litellm" `
-     -d "@litellm/examples/request-openai.json"
-   ```
-
-   To test Groq instead:
-
-   ```powershell
-   curl.exe -X POST http://localhost:4000/v1/chat/completions `
-     -H "Content-Type: application/json" `
-     -H "Authorization: Bearer sk-local-litellm" `
-     -d "@litellm/examples/request-groq.json"
-   ```
-
-7. You can also test manually in Postman:
-
-   - Method: `POST`
-   - URL: `http://localhost:4000/v1/chat/completions`
-   - Header: `Content-Type: application/json`
-   - Header: `Authorization: Bearer sk-local-litellm`
-   - Body type: `raw` / `JSON`
-   - Body:
-
-   ```json
-   {
-     "model": "secure-gpt",
-     "messages": [
-       {
-         "role": "user",
-         "content": "Bonjour, est-ce que LiteLLM fonctionne ?"
-       }
-     ]
-   }
-   ```
-
-## Expected Result
-
-The test should return a JSON response from LiteLLM containing the model answer for the selected alias.
-
-## Spring Boot Backend
-
-The backend implementation lives in `backend/`. It exposes a REST API on port `8080`, persists conversations in PostgreSQL, and forwards contextual chat requests to LiteLLM.
-
-Run PostgreSQL and LiteLLM from the project root first:
-
-```bash
-docker compose up -d postgres litellm
+```powershell
+Copy-Item .env.example .env
 ```
 
-In IntelliJ, open the backend run configuration and add these environment variables:
+Fill `.env` with local values:
 
 ```env
-LITELLM_MASTER_KEY=your-local-litellm-master-key
+OPENAI_API_KEY=your_openai_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+MISTRAL_API_KEY=your_mistral_api_key_here
+
+LITELLM_MASTER_KEY=sk-local-litellm
+LITELLM_PORT=4000
+
+POSTGRES_DB=secure_llm_gateway
+POSTGRES_USER=secure_llm_user
+POSTGRES_PASSWORD=change_me_local_only
+POSTGRES_HOST_PORT=5433
+
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/secure_llm_gateway
 SPRING_DATASOURCE_USERNAME=secure_llm_user
 SPRING_DATASOURCE_PASSWORD=change_me_local_only
 ```
 
-Use the same `LITELLM_MASTER_KEY` value that is configured for LiteLLM. Use the PostgreSQL password from your local `.env`. Do not commit real values.
+Important:
 
-The backend uses Flyway migrations from:
+- `.env` is ignored by Git.
+- Keep `LITELLM_MASTER_KEY` identical for LiteLLM and the backend.
+- Port `5433` is used on the host to avoid common conflicts with local PostgreSQL on `5432`.
+
+## 2. Start Docker Services
+
+From the project root:
+
+```powershell
+docker compose up -d postgres litellm
+```
+
+Check the containers:
+
+```powershell
+docker compose ps
+```
+
+Useful logs:
+
+```powershell
+docker compose logs -f postgres
+docker compose logs -f litellm
+```
+
+## 3. Run the Backend
+
+Open a new terminal:
+
+```powershell
+cd backend
+$env:LITELLM_MASTER_KEY="sk-local-litellm"
+$env:SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5433/secure_llm_gateway"
+$env:SPRING_DATASOURCE_USERNAME="secure_llm_user"
+$env:SPRING_DATASOURCE_PASSWORD="change_me_local_only"
+cmd /c mvnw.cmd spring-boot:run
+```
+
+Use the same values that you placed in `.env`.
+
+Flyway runs automatically when the backend starts. It creates and validates the PostgreSQL schema. Hibernate uses:
+
+```properties
+spring.jpa.hibernate.ddl-auto=validate
+```
+
+So database schema changes must be done with Flyway migrations.
+
+## 4. Run the Frontend
+
+Open another terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
 
 ```text
-backend/src/main/resources/db/migration
+http://localhost:5173
 ```
 
-Hibernate is configured with `spring.jpa.hibernate.ddl-auto=validate`, so schema changes must be made through Flyway migrations.
-
-Current migrations:
-
-- `V1__create_llm_catalog.sql`: LLM providers and model aliases.
-- `V2__seed_active_litellm_models.sql`: active LiteLLM aliases.
-- `V3__add_model_display_name.sql`: display name for model catalog entries.
-- `V4__create_conversations_and_messages.sql`: demo user, conversations, messages and history indexes.
-- `V5__add_message_model_attribution.sql`: model attribution on assistant messages for multi-model conversations.
-
-The demo user is temporary and centralized in the backend. It is used only until authentication/JWT integration is added.
-
-Then run the Spring Boot application from:
+The frontend calls:
 
 ```text
-backend/src/main/java/com/example/backend/BackendApplication.java
+http://localhost:8080/api
 ```
 
-Test the backend:
+## 5. Quick Verification
 
-```bash
-curl http://localhost:8080/api/health
-```
-
-```bash
-curl http://localhost:8080/api/models
-```
-
-```bash
-curl -X POST http://localhost:8080/api/chat \
-  -H "Content-Type: application/json" \
-  -d "{\"model\":\"secure-groq\",\"message\":\"Bonjour, reponds en une phrase.\"}"
-```
-
-On Windows PowerShell:
+Backend health:
 
 ```powershell
 curl.exe http://localhost:8080/api/health
-curl.exe http://localhost:8080/api/models
+```
+
+Available models:
+
+```powershell
+curl.exe http://localhost:8080/api/models/details
+```
+
+Simple backend chat test:
+
+```powershell
 curl.exe -X POST http://localhost:8080/api/chat `
   -H "Content-Type: application/json" `
   -d "{\"model\":\"secure-groq\",\"message\":\"Bonjour, reponds en une phrase.\"}"
 ```
 
-## Persistent Conversations API
+Direct LiteLLM test:
 
-The existing `/api/chat` endpoint is kept for compatibility. New contextual conversations use these endpoints:
+```powershell
+curl.exe -X POST http://localhost:4000/v1/chat/completions `
+  -H "Content-Type: application/json" `
+  -H "Authorization: Bearer sk-local-litellm" `
+  -d "@litellm/examples/request-groq.json"
+```
+
+If you changed `LITELLM_MASTER_KEY`, replace `sk-local-litellm` in the Authorization header.
+
+## Main Backend Endpoints
+
+Compatibility endpoint:
+
+- `POST /api/chat`
+
+Conversation endpoints:
 
 - `POST /api/conversations`
-- `GET /api/conversations?modelAlias=secure-groq&search=test&page=0&size=20`
+- `GET /api/conversations?modelAlias=secure-groq&search=test&archived=false&page=0&size=20`
 - `GET /api/conversations/{id}`
 - `PATCH /api/conversations/{id}`
 - `PATCH /api/conversations/{id}/model`
-- `DELETE /api/conversations/{id}`
+- `DELETE /api/conversations/{id}` archives a conversation
+- `DELETE /api/conversations/{id}/permanent` deletes a conversation permanently
 - `GET /api/conversations/{id}/messages`
 - `POST /api/conversations/{id}/messages/stream`
 
-Postman scenario:
+The frontend uses the streaming endpoint for progressive assistant responses.
 
-1. Create a conversation:
+## Database
 
-   ```http
-   POST http://localhost:8080/api/conversations
-   Content-Type: application/json
-   ```
+PostgreSQL is started by Docker Compose. Data is kept in the named volume:
 
-   ```json
-   {
-     "modelAlias": "secure-groq",
-     "title": "Test Groq persistant"
-   }
-   ```
-
-2. Send a streamed contextual message using the returned `id`:
-
-   ```http
-   POST http://localhost:8080/api/conversations/{id}/messages/stream
-   Content-Type: application/json
-   Accept: text/event-stream
-   ```
-
-   ```json
-   {
-     "content": "Bonjour, reponds en une phrase."
-   }
-   ```
-
-   The stream emits structured events: `message`, `token`, `done`, and `error`.
-
-3. Resume history:
-
-   ```http
-   GET http://localhost:8080/api/conversations/{id}/messages
-   ```
-
-4. Change the current model for the next answers in the same conversation:
-
-   ```http
-   PATCH http://localhost:8080/api/conversations/{id}/model
-   Content-Type: application/json
-   ```
-
-   ```json
-   {
-     "modelAlias": "secure-gemini"
-   }
-   ```
-
-   The existing context is preserved and sent to the new active model. Previous assistant messages keep the model that actually generated them.
-
-5. Filter conversation history:
-
-   ```http
-   GET http://localhost:8080/api/conversations?modelAlias=secure-groq&search=Groq
-   ```
-
-   A multi-model conversation appears in this filtered list if its current model matches the filter or if it contains at least one assistant response generated by the filtered model.
-
-6. Rename or archive:
-
-   ```http
-   PATCH http://localhost:8080/api/conversations/{id}
-   Content-Type: application/json
-   ```
-
-   ```json
-   {
-     "title": "Nouveau titre"
-   }
-   ```
-
-   ```http
-   DELETE http://localhost:8080/api/conversations/{id}
-   ```
-
-## React Frontend
-
-The Vite frontend uses `fetch` only. It can create and resume conversations, filter history by model or title, stream assistant responses progressively, render Markdown safely, rename conversations, archive them, and choose whether a model switch starts a new conversation or continues the current one.
-
-Run it from `frontend/`:
-
-```bash
-npm install
-npm run dev
+```text
+secure_llm_postgres_data
 ```
 
-## Useful Commands
+Current migrations live in:
 
-Start PostgreSQL and LiteLLM:
+```text
+backend/src/main/resources/db/migration
+```
 
-```bash
+They create:
+
+- LLM providers and model aliases;
+- display names for the frontend;
+- a temporary local demo user;
+- conversations and messages;
+- model attribution per assistant message;
+- delete behavior for conversations and linked messages.
+
+To recreate the database from zero during local development:
+
+```powershell
+docker compose down -v
 docker compose up -d postgres litellm
 ```
 
-Stop Docker services:
+Then restart the backend so Flyway runs again.
 
-```bash
-docker compose down
+## Test Commands Before Sharing
+
+Frontend:
+
+```powershell
+cd frontend
+npm run lint
+npm run build
 ```
 
-View logs:
+Backend:
 
-```bash
-docker compose logs -f litellm
+```powershell
+cd backend
+cmd /c mvnw.cmd test
 ```
 
-View PostgreSQL logs:
+Docker Compose syntax:
 
-```bash
-docker compose logs -f postgres
+```powershell
+docker compose config
 ```
 
 ## Troubleshooting
 
-### Docker is not running
+### Docker services are not available
 
-Start Docker Desktop, then run `docker compose up -d litellm` again.
+Start Docker Desktop, then run:
 
-### Port 4000 is already used
+```powershell
+docker compose up -d postgres litellm
+```
 
-Change `LITELLM_PORT` in `.env`, for example:
+### PostgreSQL port conflict
+
+The project uses host port `5433` by default:
 
 ```env
-LITELLM_PORT=4001
+POSTGRES_HOST_PORT=5433
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/secure_llm_gateway
 ```
 
-Then call the matching port in curl or Postman.
+If you change `POSTGRES_HOST_PORT`, update `SPRING_DATASOURCE_URL` too.
 
-### Missing API key
+### Backend cannot authenticate with LiteLLM
 
-Make sure `.env` exists and contains the key for the provider you are testing:
+Make sure the backend environment variable and `.env` use the same value:
 
 ```env
-OPENAI_API_KEY=sk-your-real-key
-GROQ_API_KEY=gsk-your-real-key
-GEMINI_API_KEY=your-gemini-key
-ANTHROPIC_API_KEY=your-anthropic-key
-MISTRAL_API_KEY=your-mistral-key
+LITELLM_MASTER_KEY=sk-local-litellm
 ```
 
-Do not commit `.env`.
+### Provider returns an authentication error
 
-### Invalid master key
+Check that the matching key exists in `.env`. For example, `secure-gemini` requires `GEMINI_API_KEY`.
 
-The request must include:
+### Frontend shows Failed to fetch
 
-```http
-Authorization: Bearer sk-local-litellm
+Usually one of these services is not running:
+
+- backend on `http://localhost:8080`;
+- frontend on `http://localhost:5173`;
+- Docker services for PostgreSQL and LiteLLM.
+
+Start Docker, then the backend, then the frontend.
+
+### Maven downloads fail on first run
+
+The first backend run may download Maven dependencies. Make sure the machine has internet access.
+
+## Stop the Project
+
+Stop frontend and backend with `Ctrl+C` in their terminals.
+
+Stop Docker services:
+
+```powershell
+docker compose down
 ```
-
-If you change `LITELLM_MASTER_KEY` in `.env`, update the `Authorization` header in your curl command or Postman request accordingly.
-
-### Model or provider error
-
-Check `litellm/config.yaml` and confirm that the configured provider model is available for your API key.

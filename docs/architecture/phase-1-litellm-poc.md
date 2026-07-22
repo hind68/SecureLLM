@@ -1,52 +1,104 @@
-# Phase 1 LiteLLM PoC
+# Architecture Actuelle
 
-## Temporary Architecture
-
-Phase 1 validates the simplest possible LLM access path:
+Le projet a evolue du premier PoC LiteLLM vers un flux complet local:
 
 ```text
-Postman / curl
-        |
-        v
+React frontend
+      |
+      v
+Spring Boot backend
+      |
+      +--> PostgreSQL
+      |
+      v
 LiteLLM Proxy
-        |
-        v
-OpenAI, Groq, Gemini, or Mistral provider
-        |
-        v
-Response
+      |
+      v
+OpenAI, Groq, Gemini ou Mistral
+      |
+      v
+Reponse streammee vers React
 ```
 
-The client sends an OpenAI-compatible chat completion request to LiteLLM. LiteLLM receives the request with a local model alias, maps it to the configured provider model, forwards the request to that provider, and returns the provider response.
+## Roles des composants
 
-Current aliases:
+### React
 
-- `secure-gpt` routes to OpenAI `gpt-4o-mini`
-- `secure-groq` routes to Groq `llama-3.1-8b-instant`
-- `secure-gemini` routes to Gemini `gemini-2.5-flash`
-- `secure-mistral` routes to Mistral `mistral-small-latest`
-- `secure-claude` is prepared but still commented
+Le frontend permet de:
 
-This confirms LiteLLM extensibility before adding the Spring Boot backend. The backend will later call LiteLLM instead of calling each LLM provider directly.
+- choisir un modele;
+- creer et reprendre des conversations;
+- filtrer l'historique;
+- recevoir les reponses en streaming SSE;
+- afficher les reponses Markdown.
 
-## Scope
+### Spring Boot
 
-Included in this phase:
+Le backend expose l'API sous:
 
-- Docker Compose setup for LiteLLM
-- LiteLLM config with OpenAI, Groq, Gemini, and Mistral model aliases
-- Manual curl commands for testing
-- Manual Postman request instructions
-- Documentation for team setup
+```text
+http://localhost:8080/api
+```
 
-Not included yet:
+Il gere:
 
-- Spring Boot backend
-- React frontend
-- Additional PostgreSQL domain tables
-- Authentication and roles
-- Prompt filtering
-- Sensitive data masking/blocking
-- Audit logs and history
+- le catalogue des modeles actifs;
+- la validation du modele demande;
+- les conversations et messages;
+- le changement de modele dans une conversation;
+- l'archivage et la suppression permanente;
+- l'appel a LiteLLM.
 
-These components will be added progressively in future phases after the LiteLLM proxy flow is validated.
+### PostgreSQL
+
+PostgreSQL est lance avec Docker Compose.
+
+Depuis la machine hote:
+
+```text
+localhost:5433
+```
+
+Depuis Docker:
+
+```text
+postgres:5432
+```
+
+Flyway cree le schema automatiquement au demarrage du backend.
+
+### LiteLLM
+
+LiteLLM reste le point d'extension vers les fournisseurs LLM.
+
+Aliases actifs:
+
+- `secure-gpt` -> OpenAI `gpt-4o-mini`
+- `secure-groq` -> Groq `llama-3.1-8b-instant`
+- `secure-gemini` -> Gemini `gemini-2.5-flash`
+- `secure-mistral` -> Mistral `mistral-small-latest`
+
+Alias prepare mais commente:
+
+- `secure-claude` -> Anthropic `claude-3-5-sonnet-20241022`
+
+## Flux d'un message
+
+1. React envoie le message a Spring Boot.
+2. Spring Boot valide le modele actif dans PostgreSQL.
+3. Spring Boot enregistre le message utilisateur.
+4. Spring Boot appelle LiteLLM avec le contexte de conversation.
+5. LiteLLM appelle le fournisseur choisi.
+6. Spring Boot stream les tokens vers React.
+7. Spring Boot enregistre la reponse assistant avec le modele qui l'a generee.
+
+## Ce qui n'est pas encore inclus
+
+- Authentification reelle et roles;
+- Keycloak/JWT;
+- DLP;
+- audit bancaire complet;
+- frontend dockerise;
+- backend dockerise.
+
+Ces elements seront ajoutes dans des lots ulterieurs.
