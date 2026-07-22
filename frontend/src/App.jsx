@@ -1,11 +1,40 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
+import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
+import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown'
+import powershell from 'react-syntax-highlighter/dist/esm/languages/prism/powershell'
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import './App.css'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 const SIDEBAR_STORAGE_KEY = 'secure-llm-sidebar-open'
+
+SyntaxHighlighter.registerLanguage('bash', bash)
+SyntaxHighlighter.registerLanguage('css', css)
+SyntaxHighlighter.registerLanguage('java', java)
+SyntaxHighlighter.registerLanguage('javascript', javascript)
+SyntaxHighlighter.registerLanguage('js', javascript)
+SyntaxHighlighter.registerLanguage('json', json)
+SyntaxHighlighter.registerLanguage('jsx', jsx)
+SyntaxHighlighter.registerLanguage('markdown', markdown)
+SyntaxHighlighter.registerLanguage('md', markdown)
+SyntaxHighlighter.registerLanguage('powershell', powershell)
+SyntaxHighlighter.registerLanguage('ps1', powershell)
+SyntaxHighlighter.registerLanguage('python', python)
+SyntaxHighlighter.registerLanguage('sql', sql)
+SyntaxHighlighter.registerLanguage('yaml', yaml)
+SyntaxHighlighter.registerLanguage('yml', yaml)
 
 function App() {
   const [models, setModels] = useState([])
@@ -905,11 +934,7 @@ function App() {
                 return (
                   <article className="model-card" key={model.alias}>
                     <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
-                      {meta.logo ? (
-                        <img src={meta.logo} alt="" />
-                      ) : (
-                        <span>{meta.initials}</span>
-                      )}
+                      <ModelLogo alias={model.alias} className="model-card-logo" fallback={meta.initials} />
                     </div>
                     <div className="model-card-copy">
                       <div className="model-card-topline">
@@ -1197,30 +1222,38 @@ function MessageBubble({ copiedKey, message, fallbackModelName, onCopy, setCopie
   const isUser = message.role === 'USER'
   const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, message.modelAlias)
   const isWaiting = !isUser && message.status === 'EN_COURS' && !message.content
+  const isFailed = !isUser && message.status === 'ECHEC'
   const messageCopyKey = `message-${message.id}`
+  const promptCopyKey = `prompt-${message.id}`
+  const textDirection = detectTextDirection(message.content || '')
 
-  async function copyResponse() {
+  async function copyResponse(copyKey = messageCopyKey) {
     const success = await onCopy(message.content || '')
     if (!success) return
-    setCopiedKey(messageCopyKey)
-    window.setTimeout(() => setCopiedKey((current) => (current === messageCopyKey ? '' : current)), 1500)
+    markCopied(copyKey, setCopiedKey)
   }
 
   return (
     <article className={`message ${isUser ? 'user' : 'assistant'}`}>
       <div className="bubble">
-        {!isUser && (
-          <div className="message-label">
-            {modelName}{message.status === 'ECHEC' ? ' - echec' : ''}
-          </div>
-        )}
+        {!isUser && <AssistantMessageHeader modelAlias={message.modelAlias} modelName={modelName} />}
         {isUser ? (
-          <p>{message.content}</p>
+          <div className="user-message-wrap">
+            <p>{message.content}</p>
+          </div>
         ) : isWaiting ? (
           <TypingIndicator />
+        ) : isFailed ? (
+          <ErrorMessage content={message.content || 'La generation a echoue.'} />
         ) : (
           <>
-            <MarkdownContent content={message.content || ''} copiedKey={copiedKey} onCopy={onCopy} setCopiedKey={setCopiedKey} />
+            <MarkdownContent
+              content={message.content || ''}
+              copiedKey={copiedKey}
+              direction={textDirection}
+              onCopy={onCopy}
+              setCopiedKey={setCopiedKey}
+            />
             {message.content && (
               <div className="message-actions">
                 <button type="button" aria-label="Copier la reponse" onClick={copyResponse}>
@@ -1231,13 +1264,33 @@ function MessageBubble({ copiedKey, message, fallbackModelName, onCopy, setCopie
           </>
         )}
       </div>
+      {isUser && message.content && (
+        <div className="message-actions user-actions">
+          <button type="button" aria-label="Copier mon prompt" onClick={() => copyResponse(promptCopyKey)}>
+            {copiedKey === promptCopyKey ? <span>Copie</span> : <CopyIcon />}
+          </button>
+        </div>
+      )}
     </article>
   )
 }
 
-function MarkdownContent({ content, copiedKey, onCopy, setCopiedKey }) {
+function AssistantMessageHeader({ modelAlias, modelName }) {
+  const meta = modelCardMeta(modelAlias)
+
   return (
-    <div className="markdown-body">
+    <div className="assistant-header">
+      <ModelLogo alias={modelAlias} className={`assistant-logo ${meta.tone}`} fallback={meta.initials} />
+      <div className="assistant-meta">
+        <strong>{modelName}</strong>
+      </div>
+    </div>
+  )
+}
+
+function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }) {
+  return (
+    <div className="markdown-body" dir={direction}>
       <ReactMarkdown
         components={{
           code({ children, className, ...props }) {
@@ -1247,7 +1300,7 @@ function MarkdownContent({ content, copiedKey, onCopy, setCopiedKey }) {
             const child = Array.isArray(children) ? children[0] : children
             const props = child?.props || {}
             const className = props.className || ''
-            const match = /language-(\w+)/.exec(className)
+            const match = /language-([^\s]+)/.exec(className)
             const code = String(props.children || '').replace(/\n$/, '')
             return (
               <CodeBlock
@@ -1275,19 +1328,40 @@ function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
   async function copyCode() {
     const success = await onCopy(code)
     if (!success) return
-    setCopiedKey(copyKey)
-    window.setTimeout(() => setCopiedKey((current) => (current === copyKey ? '' : current)), 1500)
+    markCopied(copyKey, setCopiedKey)
   }
 
   return (
     <div className="code-block">
       <div className="code-block-header">
-        <span>{language || 'code'}</span>
+        <span>{formatLanguageName(language)}</span>
         <button type="button" aria-label="Copier le code" onClick={copyCode}>
-          {copiedKey === copyKey ? 'Copie' : <CopyIcon />}
+          {copiedKey === copyKey ? 'Copie' : <CopyIcon tone="light" />}
         </button>
       </div>
-      <pre><code>{code}</code></pre>
+      <SyntaxHighlighter
+        CodeTag="code"
+        PreTag="div"
+        customStyle={{
+          background: '#0b1020',
+          margin: 0,
+          padding: '15px 16px',
+        }}
+        language={language === 'code' ? 'text' : language}
+        style={vscDarkPlus}
+        wrapLongLines={false}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  )
+}
+
+function ErrorMessage({ content }) {
+  return (
+    <div className="assistant-error" role="alert">
+      <strong>Impossible de generer la reponse</strong>
+      <p>{content}</p>
     </div>
   )
 }
@@ -1302,10 +1376,22 @@ function TypingIndicator() {
   )
 }
 
-function CopyIcon() {
+function CopyIcon({ tone = 'dark' }) {
+  const src = tone === 'light' ? '/assets/white_copy.png' : '/assets/copy.png'
+  return <img className="copy-icon" src={src} alt="" aria-hidden="true" />
+}
+
+function ModelLogo({ alias, className = '', fallback }) {
+  const [canShowLogo, setCanShowLogo] = useState(Boolean(modelLogoSrc(alias)))
+  const logo = modelLogoSrc(alias)
+
+  if (!logo || !canShowLogo) {
+    return <span className={className}>{fallback}</span>
+  }
+
   return (
-    <span className="copy-icon" aria-hidden="true">
-      <span></span>
+    <span className={className}>
+      <img src={logo} alt="" onError={() => setCanShowLogo(false)} />
     </span>
   )
 }
@@ -1327,6 +1413,54 @@ function hashText(value) {
     hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
   }
   return Math.abs(hash).toString(36)
+}
+
+function markCopied(copyKey, setCopiedKey) {
+  setCopiedKey(copyKey)
+  window.setTimeout(() => setCopiedKey((current) => (current === copyKey ? '' : current)), 1500)
+}
+
+function detectTextDirection(text) {
+  const rtlMatches = text.match(/[\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/g) || []
+  const ltrMatches = text.match(/[A-Za-z\u00c0-\u024f]/g) || []
+  return rtlMatches.length > ltrMatches.length ? 'rtl' : 'ltr'
+}
+
+function formatLanguageName(language) {
+  const names = {
+    bash: 'Bash',
+    css: 'CSS',
+    html: 'HTML',
+    java: 'Java',
+    javascript: 'JavaScript',
+    js: 'JavaScript',
+    json: 'JSON',
+    jsx: 'JSX',
+    markdown: 'Markdown',
+    md: 'Markdown',
+    powershell: 'PowerShell',
+    ps1: 'PowerShell',
+    python: 'Python',
+    sql: 'SQL',
+    text: 'Texte',
+    ts: 'TypeScript',
+    tsx: 'TSX',
+    typescript: 'TypeScript',
+    yaml: 'YAML',
+    yml: 'YAML',
+  }
+  return names[language?.toLowerCase?.()] || language || 'Code'
+}
+
+function modelLogoSrc(alias) {
+  const logos = {
+    'secure-gpt': '/assets/openai-logo.png',
+    'secure-groq': '/assets/groq-logo.png',
+    'secure-gemini': '/assets/gemini-logo.png',
+    'secure-mistral': '/assets/mistral-logo.png',
+    'secure-claude': '/assets/claude-logo.png',
+  }
+  return logos[alias] || ''
 }
 
 function logDevelopmentError(label, payload) {
@@ -1376,25 +1510,21 @@ function modelCardMeta(alias) {
   const metas = {
     'secure-gpt': {
       initials: 'GPT',
-      logo: '/assets/openai-logo.png',
       tone: 'tone-openai',
       description: 'Modele generaliste adapte aux reponses concises, au raisonnement et aux usages quotidiens.',
     },
     'secure-groq': {
       initials: 'GQ',
-      logo: '/assets/grok-logo.png',
       tone: 'tone-groq',
       description: 'Modele rapide pour tester les conversations et obtenir des reponses reactives.',
     },
     'secure-gemini': {
       initials: 'GM',
-      logo: '/assets/gemini-logo.png',
       tone: 'tone-gemini',
       description: 'Modele polyvalent pour explorer, reformuler et structurer des idees.',
     },
     'secure-mistral': {
       initials: 'MS',
-      logo: '/assets/mistral-logo.png',
       tone: 'tone-mistral',
       description: 'Modele efficace pour les taches pratiques, les syntheses et les prompts directs.',
     },
