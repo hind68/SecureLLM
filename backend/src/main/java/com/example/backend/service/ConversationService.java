@@ -128,6 +128,13 @@ public class ConversationService {
     }
 
     @Transactional
+    public ConversationResponse restore(Long id) {
+        Conversation conversation = ownedConversation(id);
+        conversation.restore();
+        return toConversationResponse(conversation);
+    }
+
+    @Transactional
     public void deletePermanent(Long id) {
         Conversation conversation = ownedConversation(id);
         Long conversationId = id;

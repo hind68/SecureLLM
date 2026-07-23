@@ -104,6 +104,11 @@ public class GatewayController {
         conversationService.archive(id);
     }
 
+    @PatchMapping("/conversations/{id}/restore")
+    public ConversationResponse restoreConversation(@PathVariable Long id) {
+        return conversationService.restore(id);
+    }
+
     @DeleteMapping("/conversations/{id}/permanent")
     public void deleteConversation(@PathVariable Long id) {
         conversationService.deletePermanent(id);

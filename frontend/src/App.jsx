@@ -3,17 +3,27 @@ import ReactMarkdown from 'react-markdown'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
 import c from 'react-syntax-highlighter/dist/esm/languages/prism/c'
+import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp'
 import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
+import csharp from 'react-syntax-highlighter/dist/esm/languages/prism/csharp'
+import docker from 'react-syntax-highlighter/dist/esm/languages/prism/docker'
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go'
 import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
 import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin'
 import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown'
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup'
+import php from 'react-syntax-highlighter/dist/esm/languages/prism/php'
 import powershell from 'react-syntax-highlighter/dist/esm/languages/prism/powershell'
 import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
+import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust'
 import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
+import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx'
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
 import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import './App.css'
@@ -21,21 +31,32 @@ import './App.css'
 const API_BASE_URL = 'http://localhost:8080/api'
 const SIDEBAR_STORAGE_KEY = 'secure-llm-sidebar-open'
 const LAST_MODEL_STORAGE_KEY = 'secure-llm-last-model'
+const ACTIVE_CONVERSATION_STORAGE_KEY = 'secure-llm-active-conversation-id'
 
 SyntaxHighlighter.registerLanguage('bash', bash)
 SyntaxHighlighter.registerLanguage('c', c)
+SyntaxHighlighter.registerLanguage('cpp', cpp)
 SyntaxHighlighter.registerLanguage('css', css)
+SyntaxHighlighter.registerLanguage('csharp', csharp)
+SyntaxHighlighter.registerLanguage('docker', docker)
+SyntaxHighlighter.registerLanguage('go', go)
 SyntaxHighlighter.registerLanguage('java', java)
 SyntaxHighlighter.registerLanguage('javascript', javascript)
 SyntaxHighlighter.registerLanguage('js', javascript)
 SyntaxHighlighter.registerLanguage('json', json)
 SyntaxHighlighter.registerLanguage('jsx', jsx)
+SyntaxHighlighter.registerLanguage('kotlin', kotlin)
 SyntaxHighlighter.registerLanguage('markdown', markdown)
 SyntaxHighlighter.registerLanguage('md', markdown)
+SyntaxHighlighter.registerLanguage('markup', markup)
+SyntaxHighlighter.registerLanguage('php', php)
 SyntaxHighlighter.registerLanguage('powershell', powershell)
 SyntaxHighlighter.registerLanguage('ps1', powershell)
 SyntaxHighlighter.registerLanguage('python', python)
+SyntaxHighlighter.registerLanguage('rust', rust)
 SyntaxHighlighter.registerLanguage('sql', sql)
+SyntaxHighlighter.registerLanguage('tsx', tsx)
+SyntaxHighlighter.registerLanguage('typescript', typescript)
 SyntaxHighlighter.registerLanguage('yaml', yaml)
 SyntaxHighlighter.registerLanguage('yml', yaml)
 
@@ -53,6 +74,7 @@ function App() {
   const [chatError, setChatError] = useState('')
   const [chatNotice, setChatNotice] = useState('')
   const [copiedKey, setCopiedKey] = useState('')
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [isSending, setIsSending] = useState(false)
@@ -79,6 +101,7 @@ function App() {
   const localIdCounterRef = useRef(0)
   const shouldAutoScrollRef = useRef(true)
   const scrollFrameRef = useRef(null)
+  const activeConversationRestoreRef = useRef(false)
 
   const activeModelAlias = activeConversation?.modelAlias || selectedModel
   const activeModel = models.find((model) => model.alias === activeModelAlias)
@@ -127,6 +150,13 @@ function App() {
     setIsAdvancedFiltersOpen(false)
     setActiveView('chat')
   }, [closeTransientMenus])
+
+  const closeSidePanelOnMobile = useCallback(() => {
+    if (window.innerWidth < 820) {
+      closeSidebarPanels()
+      setIsSidebarOpen(false)
+    }
+  }, [closeSidebarPanels])
 
   const showError = useCallback((message) => {
     setChatNotice('')
@@ -182,9 +212,12 @@ function App() {
       const content = Array.isArray(data) ? data : Array.isArray(data.content) ? data.content : []
       setConversations(content)
       setHistoryError('')
+      return content
     } catch {
       setHistoryError('Impossible de charger l historique.')
+      return []
     } finally {
+      setHasLoadedHistory(true)
       setIsLoadingHistory(false)
     }
   }, [modelFilter, search, showArchived])
@@ -291,7 +324,7 @@ function App() {
     }
   }, [showError])
 
-  async function openConversation(conversation) {
+  const openConversation = useCallback(async (conversation) => {
     if (isSending) return
     try {
       setChatError('')
@@ -299,6 +332,8 @@ function App() {
       setActiveConversation(conversation)
       setSelectedModel(conversation.modelAlias)
       saveLastModel(conversation.modelAlias)
+      saveActiveConversationId(conversation.id)
+      setActiveView('chat')
       setIsLastBlockVisible(true)
       shouldAutoScrollRef.current = true
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages`)
@@ -308,7 +343,40 @@ function App() {
     } catch {
       showError('Impossible de reprendre cette conversation.')
     }
-  }
+  }, [closeSidePanelOnMobile, closeTransientMenus, isSending, showError])
+
+  useEffect(() => {
+    if (activeConversationRestoreRef.current || !hasLoadedHistory || showArchived || search.trim() || modelFilter) return
+
+    async function restoreActiveConversation() {
+      const savedId = localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY)
+      activeConversationRestoreRef.current = true
+      if (!savedId) return
+
+      let conversation = conversations.find((item) => String(item.id) === savedId)
+      if (!conversation) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/conversations/${savedId}`)
+          if (!response.ok) {
+            clearActiveConversationId()
+            return
+          }
+          conversation = await response.json()
+        } catch {
+          return
+        }
+      }
+
+      if (conversation.status === 'ARCHIVEE') {
+        clearActiveConversationId()
+        return
+      }
+
+      await openConversation(conversation)
+    }
+
+    void restoreActiveConversation()
+  }, [conversations, hasLoadedHistory, isSending, modelFilter, openConversation, search, showArchived])
 
   function newConversation(modelAlias = selectedModel) {
     if (isSending) return
@@ -316,6 +384,7 @@ function App() {
     setMessages([])
     setDraft('')
     setChatError('')
+    clearActiveConversationId()
     closeTransientMenus()
     setSelectedModel(modelAlias)
     saveLastModel(modelAlias)
@@ -335,6 +404,7 @@ function App() {
     setActiveConversation(conversation)
     setSelectedModel(conversation.modelAlias)
     saveLastModel(conversation.modelAlias)
+    saveActiveConversationId(conversation.id)
     setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
     return conversation
   }
@@ -411,7 +481,7 @@ function App() {
       events.forEach((rawEvent) => handleSseEvent(rawEvent, localUserId, localAssistantId))
     }
 
-    if (buffer.trim()) {
+    if (buffer) {
       handleSseEvent(buffer, localUserId, localAssistantId)
     }
   }
@@ -419,13 +489,11 @@ function App() {
   function handleSseEvent(rawEvent, localUserId, localAssistantId) {
     const lines = rawEvent.split('\n')
     const event = lines.find((line) => line.startsWith('event:'))?.slice(6).trim()
-    const data = lines
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trim())
-      .join('\n')
+    const data = extractSseData(lines, event === 'token')
+    const jsonData = event === 'token' ? data : data.trim()
 
     if (event === 'message') {
-      const parsed = parseJson(data)
+      const parsed = parseJson(jsonData)
       if (!parsed) return
       const targetId = parsed.role === 'USER' ? localUserId : localAssistantId
       setMessages((current) =>
@@ -446,7 +514,7 @@ function App() {
     }
 
     if (event === 'done') {
-      const parsed = parseJson(data)
+      const parsed = parseJson(jsonData)
       setMessages((current) =>
         current.map((item) =>
           item.id === localAssistantId
@@ -459,7 +527,7 @@ function App() {
     if (event === 'error') {
       setMessages((current) =>
         current.map((item) =>
-          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || data } : item,
+          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || jsonData } : item,
         ),
       )
     }
@@ -496,10 +564,32 @@ function App() {
         setActiveConversation(null)
         setMessages([])
       }
+      clearActiveConversationId(conversation.id)
       closeMenus()
       await loadConversations()
     } catch {
       showError('Impossible d archiver la conversation.')
+    }
+  }
+
+  async function restoreConversation(conversation) {
+    if (!conversation || isSending) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/restore`, { method: 'PATCH' })
+      if (!response.ok) throw new Error(await requestStatusMessage(response, 'Impossible de desarchiver la conversation.'))
+      const updated = await response.json()
+      setConversations((current) => current.filter((item) => item.id !== updated.id))
+      if (activeConversation?.id === updated.id) {
+        setActiveConversation(updated)
+        setSelectedModel(updated.modelAlias)
+        saveLastModel(updated.modelAlias)
+        saveActiveConversationId(updated.id)
+      }
+      closeMenus()
+      showNotice('Conversation desarchivee.')
+      await loadConversations()
+    } catch (error) {
+      showError(requestErrorMessage(error, 'Impossible de desarchiver la conversation.'))
     }
   }
 
@@ -530,6 +620,7 @@ function App() {
         setActiveConversation(null)
         setMessages([])
       }
+      clearActiveConversationId(conversation.id)
       closeMenus()
       showNotice('Conversation supprimee.')
       await loadConversations()
@@ -563,6 +654,7 @@ function App() {
       setActiveConversation(updated)
       setSelectedModel(updated.modelAlias)
       saveLastModel(updated.modelAlias)
+      saveActiveConversationId(updated.id)
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setModelDecision(null)
     } catch (error) {
@@ -622,13 +714,6 @@ function App() {
     setCollapsedPanel((current) => (current === panel ? null : panel))
   }
 
-  function closeSidePanelOnMobile() {
-    if (window.innerWidth < 820) {
-      closeSidebarPanels()
-      setIsSidebarOpen(false)
-    }
-  }
-
   function modelDisplayName(alias) {
     return models.find((model) => model.alias === alias)?.displayName || cleanModelName(alias, alias) || 'Modele'
   }
@@ -674,53 +759,55 @@ function App() {
         </div>
 
         <nav className="sidebar-navigation" aria-label="Actions principales">
-          <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { closeSidebarPanels(); newConversation() }}>
-            <span className="sidebar-icon" aria-hidden="true">
-              <img src="/assets/new-tab.png" alt="" />
-            </span>
-            <span>Nouvelle conversation</span>
-          </button>
-          <button
-            className={isFilterOpen || collapsedPanel === 'search' ? 'active' : ''}
-            type="button"
-            title="Rechercher"
-            aria-label="Rechercher"
-            onClick={() => {
-              if (isSidebarOpen) {
+          <div className="sidebar-primary-nav">
+            <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { closeSidebarPanels(); newConversation() }}>
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/new-tab.png" alt="" />
+              </span>
+              <span>Nouvelle conversation</span>
+            </button>
+            <button
+              className={isFilterOpen || collapsedPanel === 'search' ? 'active' : ''}
+              type="button"
+              title="Rechercher"
+              aria-label="Rechercher"
+              onClick={() => {
+                if (isSidebarOpen) {
+                  setIsAccountMenuOpen(false)
+                  setActiveView('chat')
+                  setCollapsedPanel(null)
+                  setIsFilterOpen((current) => !current)
+                } else {
+                  setShowArchived(false)
+                  setIsFilterOpen(true)
+                  toggleCollapsedPanel('search')
+                }
+              }}
+            >
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/search.png" alt="" />
+              </span>
+              <span>Rechercher</span>
+            </button>
+            <button
+              className={isModelsView ? 'active' : ''}
+              type="button"
+              title="Explorer les modeles"
+              aria-label="Explorer les modeles"
+              onClick={() => {
+                closeTransientMenus()
                 setIsAccountMenuOpen(false)
-                setActiveView('chat')
-                setCollapsedPanel(null)
-                setIsFilterOpen((current) => !current)
-              } else {
-                setShowArchived(false)
-                setIsFilterOpen(true)
-                toggleCollapsedPanel('search')
-              }
-            }}
-          >
-            <span className="sidebar-icon" aria-hidden="true">
-              <img src="/assets/search.png" alt="" />
-            </span>
-            <span>Rechercher</span>
-          </button>
-          <button
-            className={isModelsView ? 'active' : ''}
-            type="button"
-            title="Explorer les modeles"
-            aria-label="Explorer les modeles"
-            onClick={() => {
-              closeTransientMenus()
-              setIsAccountMenuOpen(false)
-              setIsFilterOpen(false)
-              setIsAdvancedFiltersOpen(false)
-              setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
-            }}
-          >
-            <span className="sidebar-icon" aria-hidden="true">
-              <img src="/assets/compass.png" alt="" />
-            </span>
-            <span>Explorer les modeles</span>
-          </button>
+                setIsFilterOpen(false)
+                setIsAdvancedFiltersOpen(false)
+                setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
+              }}
+            >
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/compass.png" alt="" />
+              </span>
+              <span>Explorer les modeles</span>
+            </button>
+          </div>
           <button
             className={`recent-nav-button ${collapsedPanel === 'history' ? 'active' : ''}`}
             type="button"
@@ -799,6 +886,8 @@ function App() {
             archiveConversation={archiveConversation}
             deleteConversation={deleteConversation}
             renameConversation={renameConversation}
+            restoreConversation={restoreConversation}
+            showArchived={showArchived}
           />
         </section>
 
@@ -881,6 +970,8 @@ function App() {
             archiveConversation={archiveConversation}
             deleteConversation={deleteConversation}
             renameConversation={renameConversation}
+            restoreConversation={restoreConversation}
+            showArchived={showArchived}
           />
         </div>
       )}
@@ -917,7 +1008,8 @@ function App() {
               <ConversationMenu
                 id="header-conversation-menu"
                 isOpen={isHeaderMenuOpen}
-                onArchive={() => archiveConversation(activeConversation)}
+                archiveLabel={activeConversation.status === 'ARCHIVEE' ? 'Desarchiver' : 'Archiver'}
+                onArchive={() => (activeConversation.status === 'ARCHIVEE' ? restoreConversation(activeConversation) : archiveConversation(activeConversation))}
                 onDelete={() => deleteConversation(activeConversation)}
                 onOpen={() => {
                   setIsAccountMenuOpen(false)
@@ -1069,7 +1161,7 @@ function App() {
   )
 }
 
-function ConversationMenu({ id, isOpen, onOpen, onRename, onArchive, onDelete }) {
+function ConversationMenu({ id, isOpen, onOpen, onRename, onArchive, onDelete, archiveLabel = 'Archiver' }) {
   const [placement, setPlacement] = useState('bottom')
 
   function handleOpen(event) {
@@ -1094,7 +1186,7 @@ function ConversationMenu({ id, isOpen, onOpen, onRename, onArchive, onDelete })
       {isOpen && (
         <div className="menu-popover" id={`${id}-menu`} role="menu">
           <button type="button" role="menuitem" onClick={onRename}>Renommer</button>
-          <button type="button" role="menuitem" onClick={onArchive}>Archiver</button>
+          <button type="button" role="menuitem" onClick={onArchive}>{archiveLabel}</button>
           <button type="button" role="menuitem" className="danger" onClick={onDelete}>Supprimer</button>
         </div>
       )}
@@ -1115,6 +1207,8 @@ function HistoryList({
   archiveConversation,
   deleteConversation,
   renameConversation,
+  restoreConversation,
+  showArchived,
 }) {
   return (
     <>
@@ -1131,13 +1225,14 @@ function HistoryList({
         {conversations.map((conversation) => (
           <div className={`history-row ${activeConversation?.id === conversation.id ? 'active' : ''}`} key={conversation.id}>
             <button className="history-item" type="button" onClick={() => openConversation(conversation)}>
-              <span>{conversation.title}</span>
-              <small>{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
+              <span>{displayConversationTitle(conversation.title)}</span>
+              <small className="model-badge">{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
             </button>
             <ConversationMenu
               id={`conversation-${conversation.id}`}
               isOpen={openMenuId === conversation.id}
-              onArchive={() => archiveConversation(conversation)}
+              archiveLabel={showArchived || conversation.status === 'ARCHIVEE' ? 'Desarchiver' : 'Archiver'}
+              onArchive={() => (showArchived || conversation.status === 'ARCHIVEE' ? restoreConversation(conversation) : archiveConversation(conversation))}
               onDelete={() => deleteConversation(conversation)}
               onOpen={() => {
                 setIsAccountMenuOpen(false)
@@ -1302,7 +1397,7 @@ function AssistantMessageHeader({ modelAlias, modelName }) {
 }
 
 function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }) {
-  const normalizedContent = normalizeMarkdownCodeFences(content)
+  const normalizedContent = normalizeAssistantMarkdown(normalizeMarkdownCodeFences(content))
 
   return (
     <div className="markdown-body" dir={direction}>
@@ -1317,12 +1412,11 @@ function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }
             const className = props.className || ''
             const match = /language-([^\s]+)/.exec(className)
             const code = String(props.children || '').replace(/\n$/, '')
-            const language = normalizeCodeLanguage(match?.[1] || 'text')
             return (
               <CodeBlock
                 code={code}
                 copiedKey={copiedKey}
-                language={language}
+                language={match?.[1] || 'text'}
                 onCopy={onCopy}
                 setCopiedKey={setCopiedKey}
               />
@@ -1339,8 +1433,8 @@ function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }
 }
 
 function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
-  const normalizedLanguage = normalizeCodeLanguage(language)
-  const copyKey = `code-${hashText(`${normalizedLanguage}:${code}`)}`
+  const detectedLanguage = detectCodeLanguage(code, language)
+  const copyKey = `code-${hashText(`${detectedLanguage}:${code}`)}`
 
   async function copyCode() {
     const success = await onCopy(code)
@@ -1351,7 +1445,7 @@ function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
   return (
     <div className="code-block">
       <div className="code-block-header">
-        <span>{formatLanguageName(normalizedLanguage)}</span>
+        <span>{formatLanguageName(detectedLanguage)}</span>
         <button type="button" aria-label="Copier le code" onClick={copyCode}>
           {copiedKey === copyKey ? 'Copie' : <CopyIcon tone="light" />}
         </button>
@@ -1364,8 +1458,14 @@ function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
           margin: 0,
           padding: '15px 16px',
         }}
-        language={normalizedLanguage}
-        style={vscDarkPlus}
+        language={detectedLanguage}
+        lineNumberStyle={{
+          color: 'rgba(203, 213, 225, 0.38)',
+          minWidth: '2.25em',
+          paddingRight: '1em',
+        }}
+        showLineNumbers={code.split('\n').length > 15}
+        style={oneDark}
         wrapLongLines={false}
       >
         {code}
@@ -1445,10 +1545,12 @@ function detectTextDirection(text) {
 function normalizeMarkdownCodeFences(content) {
   return String(content || '').replace(/^```([^\s`]+)(.*)$/gm, (line, rawLanguage, rest) => {
     const language = String(rawLanguage || '').trim()
-    const normalized = normalizeCodeLanguage(language)
-    if (normalized === 'c' && /^c#/i.test(language)) {
-      return `\`\`\`c\n${language.slice(1)}${rest || ''}`.trimEnd()
+    const stickyFence = splitStickyFenceLanguage(language, rest || '')
+    if (stickyFence) {
+      return `\`\`\`${stickyFence.language}\n${stickyFence.code}`.trimEnd()
     }
+
+    const normalized = normalizeCodeLanguage(language)
     if (normalized !== 'text' && normalized !== language.toLowerCase()) {
       return `\`\`\`${normalized}${rest || ''}`
     }
@@ -1456,30 +1558,137 @@ function normalizeMarkdownCodeFences(content) {
   })
 }
 
+function normalizeAssistantMarkdown(content) {
+  let isCodeBlock = false
+  return String(content || '')
+    .split('\n')
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        isCodeBlock = !isCodeBlock
+        return line
+      }
+
+      if (isCodeBlock) return line
+
+      return line.replace(/^(#{1,6})(?=\S)/, (match, hashes) => {
+        if (hashes.length === 1 && /^#include\b/i.test(line)) return match
+        return `${hashes} `
+      })
+    })
+    .join('\n')
+}
+
+function splitStickyFenceLanguage(language, rest) {
+  const value = String(language || '')
+  const lower = value.toLowerCase()
+  const candidates = [
+    { language: 'cpp', match: /^cpp(#include)/i, prefixLength: 3 },
+    { language: 'c', match: /^c(#include)/i, prefixLength: 1 },
+    { language: 'java', match: /^java(import|package|public|class)/i, prefixLength: 4 },
+    { language: 'python', match: /^python(from|import|def|class)/i, prefixLength: 6 },
+  ]
+  const candidate = candidates.find((item) => item.match.test(lower))
+  if (!candidate) return null
+
+  return {
+    language: candidate.language,
+    code: `${value.slice(candidate.prefixLength)}${rest}`,
+  }
+}
+
 function normalizeCodeLanguage(language) {
   const value = String(language || '').trim().toLowerCase()
   if (!value || value === 'code' || value === 'text') return 'text'
-  if (value === 'c' || value === 'c99' || value === 'c11' || value.startsWith('c#')) return 'c'
 
-  const supported = new Set([
-    'bash',
-    'css',
-    'java',
-    'javascript',
-    'js',
-    'json',
-    'jsx',
-    'markdown',
-    'md',
-    'powershell',
-    'ps1',
-    'python',
-    'sql',
-    'yaml',
-    'yml',
-  ])
+  const aliases = {
+    c99: 'c',
+    c11: 'c',
+    cpp: 'cpp',
+    'c++': 'cpp',
+    'c#': 'csharp',
+    csharp: 'csharp',
+    cs: 'csharp',
+    js: 'javascript',
+    ts: 'typescript',
+    sh: 'bash',
+    shell: 'bash',
+    zsh: 'bash',
+    html: 'markup',
+    htm: 'markup',
+    xml: 'markup',
+    py: 'python',
+    yml: 'yaml',
+    ps1: 'powershell',
+    dockerfile: 'docker',
+  }
 
-  return supported.has(value) ? value : 'text'
+  if (aliases[value]) return aliases[value]
+  if (value.startsWith('c#include')) return 'c'
+  if (value.startsWith('cpp#include')) return 'cpp'
+
+  return supportedCodeLanguages.has(value) ? value : 'text'
+}
+
+const supportedCodeLanguages = new Set([
+  'bash',
+  'c',
+  'cpp',
+  'csharp',
+  'css',
+  'docker',
+  'go',
+  'java',
+  'javascript',
+  'json',
+  'jsx',
+  'kotlin',
+  'markdown',
+  'markup',
+  'php',
+  'powershell',
+  'python',
+  'rust',
+  'sql',
+  'tsx',
+  'typescript',
+  'yaml',
+])
+
+function detectCodeLanguage(code, declaredLanguage) {
+  const declared = normalizeCodeLanguage(declaredLanguage)
+  if (declared !== 'text') return declared
+
+  const source = String(code || '').trim()
+  if (!source) return 'text'
+  const lower = source.toLowerCase()
+
+  if (/^\s*[{[]/.test(source)) {
+    try {
+      JSON.parse(source)
+      return 'json'
+    } catch {
+      // Keep checking other languages.
+    }
+  }
+
+  if (/#include\s*[<"]/.test(source) && /using\s+namespace\s+std|std::|cout\s*<</.test(source)) return 'cpp'
+  if (/#include\s*[<"]/.test(source)) return 'c'
+  if (/console\.writeline|using\s+system|namespace\s+\w+\s*{|static\s+void\s+main\s*\(/i.test(source)) return 'csharp'
+  if (/public\s+static\s+void\s+main\s*\(|system\.out\.println|import\s+java\./i.test(source)) return 'java'
+  if (/import\s+react|from\s+['"]react['"]|<[A-Z][\w.]*[\s>]|className=|<\/[A-Z][\w.]*>/i.test(source)) return 'jsx'
+  if (/\binterface\s+\w+|:\s*(string|number|boolean|unknown|any)\b|type\s+\w+\s*=/.test(source)) return 'typescript'
+  if (/^\s*(def|class)\s+\w+|^\s*from\s+\w+\s+import\s+|^\s*import\s+\w+/m.test(source)) return 'python'
+  if (/\b(select|insert\s+into|update|delete\s+from|create\s+table|alter\s+table)\b[\s\S]*(\bfrom\b|\bvalues\b|\bset\b|\()/i.test(source)) return 'sql'
+  if (/^\s*<!doctype html|<html[\s>]|<\/?[a-z][\w:-]*(\s+[^>]*)?>/i.test(source)) return 'markup'
+  if (/^\s*[\w.#:[\]-]+\s*{[\s\S]*:\s*[^;]+;[\s\S]*}/.test(source)) return 'css'
+  if (/^\s*(function|const|let|var)\s+\w+|=>|console\.log/i.test(source)) return 'javascript'
+  if (/^\s*FROM\s+\S+|^\s*RUN\s+|^\s*COPY\s+|^\s*CMD\s+/im.test(source)) return 'docker'
+  if (/^\s*package\s+main|fmt\.Println|func\s+\w+\s*\(/m.test(source)) return 'go'
+  if (/^\s*fn\s+\w+\s*\(|println!\s*\(|let\s+mut\s+/m.test(source)) return 'rust'
+  if (/^\s*fun\s+\w+\s*\(|println\s*\(|val\s+\w+\s*=|var\s+\w+\s*=/m.test(source)) return 'kotlin'
+  if (/<\?php|\becho\s+['"]|\$\w+\s*=/.test(lower)) return 'php'
+
+  return 'text'
 }
 
 function formatLanguageName(language) {
@@ -1487,21 +1696,27 @@ function formatLanguageName(language) {
   const names = {
     bash: 'Bash',
     c: 'C',
+    cpp: 'C++',
+    csharp: 'C#',
     css: 'CSS',
+    docker: 'Dockerfile',
+    go: 'Go',
     java: 'Java',
     javascript: 'JavaScript',
-    js: 'JavaScript',
     json: 'JSON',
     jsx: 'JSX',
+    kotlin: 'Kotlin',
     markdown: 'Markdown',
-    md: 'Markdown',
+    markup: 'HTML',
+    php: 'PHP',
     powershell: 'PowerShell',
-    ps1: 'PowerShell',
     python: 'Python',
+    rust: 'Rust',
     sql: 'SQL',
     text: 'Code',
+    tsx: 'TSX',
+    typescript: 'TypeScript',
     yaml: 'YAML',
-    yml: 'YAML',
   }
   return names[normalized] || 'Code'
 }
@@ -1531,9 +1746,32 @@ function parseJson(value) {
   }
 }
 
+function extractSseData(lines, preserveWhitespace = false) {
+  return lines
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => {
+      const value = line.slice(5).replace(/\r$/, '')
+      if (preserveWhitespace) return value.startsWith(' ') ? value.slice(1) : value
+      return value.startsWith(' ') ? value.slice(1) : value.trim()
+    })
+    .join('\n')
+}
+
 function saveLastModel(alias) {
   if (!alias) return
   localStorage.setItem(LAST_MODEL_STORAGE_KEY, alias)
+}
+
+function saveActiveConversationId(id) {
+  if (!id) return
+  localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, String(id))
+}
+
+function clearActiveConversationId(id) {
+  const current = localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY)
+  if (!id || current === String(id)) {
+    localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY)
+  }
 }
 
 function selectAvailableModel(models, currentAlias) {
@@ -1560,6 +1798,12 @@ function cleanModelName(value, alias) {
     .replace(/^secure[-_\s]*/i, '')
     .replace(/\bGro[kq]\b/g, 'Groq')
     .trim()
+}
+
+function displayConversationTitle(title) {
+  return String(title || 'Nouvelle conversation')
+    .replace(/^Discussion:\s*/i, '')
+    .trim() || 'Nouvelle conversation'
 }
 
 function modelProviderName(alias) {

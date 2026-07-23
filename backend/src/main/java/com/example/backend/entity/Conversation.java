@@ -80,6 +80,10 @@ public class Conversation {
         this.statut = StatutConversation.ARCHIVEE;
     }
 
+    public void restore() {
+        this.statut = StatutConversation.ACTIVE;
+    }
+
     public void changeModel(ModeleLlm modele) {
         this.modele = modele;
     }

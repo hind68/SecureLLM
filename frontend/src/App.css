@@ -1,3 +1,16 @@
+:root {
+  --ui-blue-900: #243b6b;
+  --ui-blue-100: #edf3ff;
+  --ui-blue-150: #e5eefc;
+  --ui-orange-600: #c46b36;
+  --ui-orange-700: #b85d2b;
+  --sidebar-surface: rgba(250, 252, 255, 0.88);
+  --sidebar-surface-strong: rgba(255, 255, 255, 0.72);
+  --sidebar-hover: rgba(32, 37, 47, 0.055);
+  --sidebar-divider: rgba(37, 48, 67, 0.075);
+  --badge-surface: rgba(39, 45, 56, 0.065);
+}
+
 .app-shell {
   min-height: 100vh;
   background: #ffffff;
@@ -214,7 +227,6 @@
   height: 58px;
   display: grid;
   place-items: center;
-  transform: translateY(-22px);
 }
 
 .model-card-logo img {
@@ -712,9 +724,33 @@
 
 .messages {
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 24px 88px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(40, 50, 68, 0.22) transparent;
+}
+
+.messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(40, 50, 68, 0.22);
+  background-clip: content-box;
+}
+
+.messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(40, 50, 68, 0.34);
+  background-clip: content-box;
+}
+
+.messages::-webkit-scrollbar-track,
+.messages::-webkit-scrollbar-button {
+  background: transparent;
 }
 
 .welcome-mode .messages {
@@ -723,10 +759,15 @@
   padding-bottom: 0;
 }
 
+.conversation-mode .messages {
+  display: block;
+  place-items: initial;
+}
+
 .chat-main.welcome-mode {
   background:
-    radial-gradient(circle at 35% 35%, rgba(155, 214, 255, 0.2), transparent 34%),
-    radial-gradient(circle at 68% 42%, rgba(255, 202, 163, 0.23), transparent 32%),
+    radial-gradient(circle at 35% 50%, rgba(155, 214, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 68% 50%, rgba(255, 202, 163, 0.28), transparent 32%),
     linear-gradient(135deg, #ffffff 0%, #fbfdff 48%, #fffaf6 100%);
 }
 
@@ -803,6 +844,8 @@
 }
 
 .assistant-header {
+  position: relative;
+  left: -8px;
   min-height: 30px;
   width: 100%;
   display: flex;
@@ -828,8 +871,8 @@
 }
 
 .assistant-logo img {
-  width: 27px;
-  height: 27px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
   display: block;
 }
@@ -843,7 +886,7 @@
 
 .assistant-meta strong {
   min-width: 0;
-  color: #252525;
+  color: #2f2f2f;
   font-size: 13px;
   font-weight: 620;
   line-height: 1.2;
@@ -1028,6 +1071,15 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   direction: ltr;
   text-align: left;
+}
+
+.code-block,
+.code-block pre,
+.code-block code,
+.code-block code span {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
 }
 
 .markdown-body[dir="rtl"] .code-block {
@@ -1573,6 +1625,10 @@ textarea:focus-visible {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  .assistant-header {
+    left: -4px;
+  }
+
   .composer-center,
   .sidebar-closed .composer-center {
     left: calc(56px + (100vw - 56px) / 2);
@@ -1593,8 +1649,11 @@ textarea:focus-visible {
   width: var(--sidebar-open-width);
   height: 100vh;
   max-height: 100vh;
-  border-right: 1px solid var(--border-subtle);
-  background: #ffffff;
+  border-right: 1px solid var(--sidebar-divider);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(247, 250, 255, 0.86)),
+    var(--sidebar-surface);
+  backdrop-filter: blur(18px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1677,7 +1736,8 @@ textarea:focus-visible {
 
 .sidebar-brand span {
   font-size: 20px;
-  font-weight: 760;
+  font-weight: 500;
+  letter-spacing: 0;
   line-height: 1;
   transition: opacity 160ms ease;
 }
@@ -1693,21 +1753,30 @@ textarea:focus-visible {
 }
 
 .sidebar-toggle:hover {
-  background: #f5f5f5;
+  background: var(--sidebar-hover);
 }
 
 .sidebar-toggle img {
-  width: 21px;
-  height: 21px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
-  opacity: 0.82;
+  opacity: 0.68;
 }
 
 .sidebar-navigation {
   flex-shrink: 0;
-  display: grid;
-  gap: 2px;
-  padding: 3px 0 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 3px 0 10px;
+}
+
+.sidebar-primary-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sidebar-divider);
+  margin-bottom: 6px;
 }
 
 .sidebar-navigation button {
@@ -1725,11 +1794,12 @@ textarea:focus-visible {
 }
 
 .sidebar-navigation button:hover {
-  background: #f5f5f5;
+  background: var(--sidebar-hover);
 }
 
 .sidebar-navigation button.active {
-  background: #f3f3f3;
+  background: var(--ui-blue-100);
+  color: var(--ui-blue-900);
 }
 
 .sidebar-icon,
@@ -1772,7 +1842,7 @@ textarea:focus-visible {
 
 .sidebar-closed .sidebar-navigation button:hover .sidebar-icon::before,
 .sidebar-closed .sidebar-navigation button.active .sidebar-icon::before {
-  background: #f5f5f5;
+  background: var(--sidebar-hover);
 }
 
 .sidebar-navigation img {
@@ -1862,16 +1932,26 @@ textarea:focus-visible {
   gap: 6px;
   padding: 0 3px 8px 0;
   scrollbar-width: thin;
-  scrollbar-color: #d6d6d6 transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 160ms ease;
+}
+
+.recent-section .history:hover {
+  scrollbar-color: rgba(40, 50, 68, 0.18) transparent;
 }
 
 .recent-section .history::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .recent-section .history::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #d6d6d6;
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.recent-section .history:hover::-webkit-scrollbar-thumb {
+  background: rgba(40, 50, 68, 0.18);
 }
 
 .recent-section .history::-webkit-scrollbar-track,
@@ -1884,12 +1964,16 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
   align-items: center;
-  border-radius: 12px;
+  border-radius: 8px;
+  transition: background-color 140ms ease;
 }
 
-.recent-section .history-row:hover,
+.recent-section .history-row:hover {
+  background: var(--sidebar-hover);
+}
+
 .recent-section .history-row.active {
-  background: #f3f3f3;
+  background: var(--ui-blue-100);
 }
 
 .recent-section .history-item {
@@ -1899,8 +1983,8 @@ textarea:focus-visible {
   color: #242424;
   cursor: pointer;
   display: grid;
-  gap: 4px;
-  padding: 8px 6px 8px 10px;
+  gap: 6px;
+  padding: 9px 7px 9px 10px;
   text-align: left;
 }
 
@@ -1919,8 +2003,20 @@ textarea:focus-visible {
 }
 
 .recent-section .history-item small {
-  color: #8f8f8f;
-  font-size: 11px;
+  color: #626a75;
+  font-size: 10.5px;
+}
+
+.recent-section .history-item .model-badge {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 50px;
+  background: var(--badge-surface);
+  color: #657080;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.1;
 }
 
 .recent-section .conversation-menu {
@@ -1937,8 +2033,9 @@ textarea:focus-visible {
 .sidebar-user {
   position: relative;
   flex-shrink: 0;
-  border-top: 1px solid var(--border-subtle);
-  background: #ffffff;
+  border-top: 1px solid var(--sidebar-divider);
+  background: var(--sidebar-surface-strong);
+  backdrop-filter: blur(14px);
   padding: 8px 0;
 }
 
@@ -1961,7 +2058,7 @@ textarea:focus-visible {
 }
 
 .sidebar-user > button:hover {
-  background: #f5f5f5;
+  background: var(--sidebar-hover);
 }
 
 .sidebar-closed .sidebar-user > button:hover {
@@ -1969,14 +2066,14 @@ textarea:focus-visible {
 }
 
 .sidebar-closed .sidebar-user > button:hover .user-avatar-wrapper::before {
-  background: #f5f5f5;
+  background: var(--sidebar-hover);
 }
 
 .user-avatar {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: #c7652b;
+  background: var(--ui-orange-600);
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -1987,7 +2084,9 @@ textarea:focus-visible {
 
 .user-copy {
   min-width: 0;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   transition: opacity 160ms ease;
 }
 
@@ -2060,8 +2159,8 @@ textarea:focus-visible {
 }
 
 .sidebar-closed .sidebar-logo-hover {
-  width: 27px;
-  height: 27px;
+  width: 22px;
+  height: 22px;
 }
 
 .sidebar-closed .sidebar-navigation {
@@ -2191,16 +2290,26 @@ textarea:focus-visible {
   gap: 5px;
   padding-right: 2px;
   scrollbar-width: thin;
-  scrollbar-color: #d6d6d6 transparent;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 160ms ease;
+}
+
+.collapsed-panel .history:hover {
+  scrollbar-color: rgba(40, 50, 68, 0.18) transparent;
 }
 
 .collapsed-panel .history::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .collapsed-panel .history::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #d6d6d6;
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.collapsed-panel .history:hover::-webkit-scrollbar-thumb {
+  background: rgba(40, 50, 68, 0.18);
 }
 
 .collapsed-panel .history::-webkit-scrollbar-track,
@@ -2213,12 +2322,16 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
   align-items: center;
-  border-radius: 11px;
+  border-radius: 8px;
+  transition: background-color 140ms ease;
 }
 
-.collapsed-panel .history-row:hover,
+.collapsed-panel .history-row:hover {
+  background: var(--sidebar-hover);
+}
+
 .collapsed-panel .history-row.active {
-  background: #f3f3f3;
+  background: var(--ui-blue-100);
 }
 
 .collapsed-panel .history-item {
@@ -2228,8 +2341,8 @@ textarea:focus-visible {
   color: #242424;
   cursor: pointer;
   display: grid;
-  gap: 4px;
-  padding: 8px 6px 8px 9px;
+  gap: 6px;
+  padding: 9px 7px 9px 10px;
   text-align: left;
 }
 
@@ -2248,8 +2361,20 @@ textarea:focus-visible {
 }
 
 .collapsed-panel .history-item small {
-  color: #8d8d8d;
-  font-size: 11.5px;
+  color: #626a75;
+  font-size: 10.5px;
+}
+
+.collapsed-panel .history-item .model-badge {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 50px;
+  background: var(--badge-surface);
+  color: #657080;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.1;
 }
 
 .collapsed-panel .conversation-menu {

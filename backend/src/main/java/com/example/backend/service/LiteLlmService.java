@@ -1,6 +1,7 @@
 package com.example.backend.service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -15,6 +16,18 @@ import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 
 @Service
 public class LiteLlmService {
+
+    private static final LiteLlmMessage SYSTEM_FORMATTING_INSTRUCTION = new LiteLlmMessage(
+            "system",
+            """
+            Reponds avec du Markdown valide.
+            Ajoute toujours un espace apres les titres Markdown (#, ##, ###).
+            Utilise des fences de code explicites comme ```python ou ```java.
+            Mets une seule instruction de code par ligne et conserve l indentation correcte.
+            Ne traduis jamais les mots-cles, fonctions, classes, variables ou identifiants du code en arabe.
+            Si l utilisateur demande une explication en arabe, explique en arabe mais garde le code dans son langage de programmation.
+            """
+    );
 
     private final WebClient webClient;
     private final String masterKey;
@@ -78,17 +91,24 @@ public class LiteLlmService {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .map(this::extractStreamingToken)
-                .filter(token -> !token.isBlank())
+                .filter(token -> !token.isEmpty())
                 .subscribe(onToken, onError, onComplete);
     }
 
     private List<Map<String, String>> toPayload(List<LiteLlmMessage> messages) {
-        return messages.stream()
-                .map(message -> Map.of(
-                        "role", message.role(),
-                        "content", message.content()
-                ))
-                .toList();
+        List<Map<String, String>> payload = new ArrayList<>();
+        payload.add(toPayloadMessage(SYSTEM_FORMATTING_INSTRUCTION));
+        messages.stream()
+                .map(this::toPayloadMessage)
+                .forEach(payload::add);
+        return payload;
+    }
+
+    private Map<String, String> toPayloadMessage(LiteLlmMessage message) {
+        return Map.of(
+                "role", message.role(),
+                "content", message.content()
+        );
     }
 
     private String extractStreamingToken(String chunk) {
