@@ -7,6 +7,7 @@
   --sidebar-open-width: 248px;
   --sidebar-total-open-width: 248px;
   --chat-content-width: 760px;
+  --assistant-content-width: 736px;
   --border-subtle: rgba(31, 41, 55, 0.08);
 }
 
@@ -767,6 +768,7 @@
 }
 
 .message.assistant {
+  width: min(var(--assistant-content-width), calc(100% - 36px));
   justify-content: flex-start;
 }
 
