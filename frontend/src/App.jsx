@@ -78,8 +78,7 @@ function App() {
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
-  const [generatingConversationId, setGeneratingConversationId] = useState(null)
-  const [unreadConversationIds, setUnreadConversationIds] = useState(() => new Set())
+  const [conversationUiStatus, setConversationUiStatusState] = useState({})
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false')
   const [activeView, setActiveView] = useState('chat')
   const [collapsedPanel, setCollapsedPanel] = useState(null)
@@ -89,6 +88,8 @@ function App() {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [modelDecision, setModelDecision] = useState(null)
   const [pendingDeleteConversation, setPendingDeleteConversation] = useState(null)
+  const [editingConversationId, setEditingConversationId] = useState(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const [isLastBlockVisible, setIsLastBlockVisible] = useState(true)
   const [isComposerMaxed, setIsComposerMaxed] = useState(false)
   const [isComposerTransitioning, setIsComposerTransitioning] = useState(false)
@@ -107,11 +108,13 @@ function App() {
   const activeConversationIdRef = useRef(null)
   const generationAbortRef = useRef(null)
   const messageCacheRef = useRef(new Map())
+  const conversationUiStatusRef = useRef({})
   const tokenQueuesRef = useRef(new Map())
   const tokenTimersRef = useRef(new Map())
 
   const activeModelAlias = activeConversation?.modelAlias || selectedModel
   const activeModel = models.find((model) => model.alias === activeModelAlias)
+  const generatingConversationId = Object.entries(conversationUiStatus).find(([, status]) => status === 'generating')?.[0] || null
   const isGenerating = Boolean(generatingConversationId)
   const canSend = Boolean(activeModelAlias && draft.trim() && !isGenerating)
   const hasActiveMessages = messages.length > 0
@@ -174,14 +177,24 @@ function App() {
     setChatNotice(message)
   }, [])
 
-  const markConversationRead = useCallback((conversationId) => {
-    setUnreadConversationIds((current) => {
-      if (!current.has(conversationId)) return current
-      const next = new Set(current)
-      next.delete(conversationId)
-      return next
-    })
+  const setConversationUiStatus = useCallback((conversationId, status) => {
+    if (!conversationId) return
+    const key = String(conversationId)
+    conversationUiStatusRef.current = {
+      ...conversationUiStatusRef.current,
+      [key]: status,
+    }
+    setConversationUiStatusState(conversationUiStatusRef.current)
+    setConversations((current) =>
+      current.map((item) =>
+        String(item.id) === key ? { ...item, uiStatus: status } : item,
+      ),
+    )
   }, [])
+
+  const markConversationRead = useCallback((conversationId) => {
+    setConversationUiStatus(conversationId, 'idle')
+  }, [setConversationUiStatus])
 
   const loadModels = useCallback(async () => {
     setIsLoadingModels(true)
@@ -224,7 +237,11 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/conversations?${params}`)
       if (!response.ok) throw new Error(`history ${response.status}`)
       const data = await response.json()
-      const content = Array.isArray(data) ? data : Array.isArray(data.content) ? data.content : []
+      const rawContent = Array.isArray(data) ? data : Array.isArray(data.content) ? data.content : []
+      const content = rawContent.map((conversation) => ({
+        ...conversation,
+        uiStatus: conversationUiStatusRef.current[String(conversation.id)] || 'idle',
+      }))
       setConversations(content)
       setHistoryError('')
       return content
@@ -436,7 +453,7 @@ function App() {
       body: JSON.stringify({ modelAlias, title }),
     })
     if (!response.ok) throw new Error('create conversation')
-    const conversation = await response.json()
+    const conversation = { ...(await response.json()), uiStatus: 'idle' }
     setActiveConversation(conversation)
     markConversationRead(conversation.id)
     setSelectedModel(conversation.modelAlias)
@@ -485,7 +502,7 @@ function App() {
     const localAssistantId = nextLocalId('local-assistant')
     const abortController = new AbortController()
     generationAbortRef.current = abortController
-    setGeneratingConversationId(conversation.id)
+    setConversationUiStatus(conversation.id, 'generating')
 
     updateConversationMessages(conversation.id, (current) => [
       ...current,
@@ -537,6 +554,7 @@ function App() {
               : item,
           ),
         )
+        setConversationUiStatus(conversation.id, 'idle')
         return
       }
       const message = friendlyGenerationError(error)
@@ -552,7 +570,6 @@ function App() {
       if (generationAbortRef.current === abortController) {
         generationAbortRef.current = null
       }
-      setGeneratingConversationId(null)
     }
   }
 
@@ -648,33 +665,42 @@ function App() {
   }
 
   function notifyConversationReady(conversationId) {
-    if (activeConversationIdRef.current === conversationId) return
-    setUnreadConversationIds((current) => {
-      const next = new Set(current)
-      next.add(conversationId)
-      return next
-    })
+    const nextStatus = String(activeConversationIdRef.current) === String(conversationId) ? 'idle' : 'completed_unread'
+    setConversationUiStatus(conversationId, nextStatus)
   }
 
   function stopGeneration() {
     generationAbortRef.current?.abort()
   }
 
-  async function renameConversation(conversation = activeConversation) {
+  function renameConversation(conversation = activeConversation) {
     if (!conversation || isGenerating) return
-    const title = window.prompt('Nouveau titre', conversation.title)
-    if (!title?.trim()) return
+    setEditingConversationId(conversation.id)
+    setEditingTitle(displayConversationTitle(conversation.title))
+    closeMenus()
+  }
+
+  async function saveInlineRename(conversation) {
+    const title = editingTitle.trim()
+    if (!conversation || isGenerating) return
+    if (!title || title === displayConversationTitle(conversation.title)) {
+      setEditingConversationId(null)
+      setEditingTitle('')
+      return
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim() }),
+        body: JSON.stringify({ title }),
       })
       if (!response.ok) throw new Error('rename')
       const updated = await response.json()
-      setActiveConversation((current) => (current?.id === updated.id ? updated : current))
-      setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      setActiveConversation((current) => (current?.id === updated.id ? { ...updated, uiStatus: current.uiStatus } : current))
+      setConversations((current) => current.map((item) => (item.id === updated.id ? { ...updated, uiStatus: item.uiStatus } : item)))
+      setEditingConversationId(null)
+      setEditingTitle('')
       closeMenus()
     } catch {
       showError('Impossible de renommer la conversation.')
@@ -772,6 +798,12 @@ function App() {
       return
     }
     if (activeConversation.modelAlias === alias) return
+    if (messages.length === 0) {
+      setSelectedModel(alias)
+      saveLastModel(alias)
+      setActiveConversation((current) => (current ? { ...current, modelAlias: alias } : current))
+      return
+    }
     setModelDecision({ alias })
   }
 
@@ -797,13 +829,8 @@ function App() {
   }
 
   async function openNewConversationWithModel(alias) {
-    try {
-      newConversation(alias)
-      await createConversation(alias, 'Nouvelle conversation')
-      setModelDecision(null)
-    } catch {
-      showError('Impossible de creer une nouvelle conversation.')
-    }
+    newConversation(alias)
+    setModelDecision(null)
   }
 
   function onMessagesScroll() {
@@ -964,17 +991,6 @@ function App() {
         <section className="recent-section">
           <div className="history-heading">
             <span>Recents</span>
-            {isSidebarOpen && (
-              <button
-                type="button"
-                aria-label="Filtres"
-                onClick={() => {
-                  setIsSearchModalOpen(true)
-                }}
-              >
-                <img src="/assets/filter.png" alt="" />
-              </button>
-            )}
           </div>
 
           <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
@@ -994,8 +1010,11 @@ function App() {
             renameConversation={renameConversation}
             restoreConversation={restoreConversation}
             showArchived={showArchived}
-            generatingConversationId={generatingConversationId}
-            unreadConversationIds={unreadConversationIds}
+            editingConversationId={editingConversationId}
+            editingTitle={editingTitle}
+            saveInlineRename={saveInlineRename}
+            setEditingConversationId={setEditingConversationId}
+            setEditingTitle={setEditingTitle}
           />
         </section>
 
@@ -1070,8 +1089,11 @@ function App() {
             renameConversation={renameConversation}
             restoreConversation={restoreConversation}
             showArchived={showArchived}
-            generatingConversationId={generatingConversationId}
-            unreadConversationIds={unreadConversationIds}
+            editingConversationId={editingConversationId}
+            editingTitle={editingTitle}
+            saveInlineRename={saveInlineRename}
+            setEditingConversationId={setEditingConversationId}
+            setEditingTitle={setEditingTitle}
           />
         </div>
       )}
@@ -1298,6 +1320,7 @@ function App() {
           onConfirm={confirmDeleteConversation}
         />
       )}
+
     </div>
   )
 }
@@ -1350,8 +1373,11 @@ function HistoryList({
   renameConversation,
   restoreConversation,
   showArchived,
-  generatingConversationId,
-  unreadConversationIds,
+  editingConversationId,
+  editingTitle,
+  saveInlineRename,
+  setEditingConversationId,
+  setEditingTitle,
 }) {
   return (
     <>
@@ -1366,18 +1392,43 @@ function HistoryList({
         {isLoadingHistory && <div className="history-empty">Chargement...</div>}
         {!isLoadingHistory && !historyError && conversations.length === 0 && <div className="history-empty">Aucune conversation</div>}
         {conversations.map((conversation) => {
-          const isGeneratingConversation = generatingConversationId === conversation.id
-          const isUnread = unreadConversationIds.has(conversation.id)
+          const isGeneratingConversation = conversation.uiStatus === 'generating'
+          const isUnread = conversation.uiStatus === 'completed_unread'
+          const isEditing = editingConversationId === conversation.id
           return (
           <div className={`history-row ${activeConversation?.id === conversation.id ? 'active' : ''} ${isUnread ? 'unread' : ''}`} key={conversation.id}>
-            <button className="history-item" type="button" onClick={() => openConversation(conversation)}>
-              <span className="history-title">
-                <span>{displayConversationTitle(conversation.title)}</span>
-                {isGeneratingConversation && <InlineGeneratingIndicator />}
-                {isUnread && !isGeneratingConversation && <span className="notification-dot" aria-label="Reponse prete"></span>}
-              </span>
-              <small className="model-badge">{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
-            </button>
+            {isEditing ? (
+              <div className="history-item editing">
+                <input
+                  autoFocus
+                  className="history-title-input"
+                  type="text"
+                  value={editingTitle}
+                  onBlur={() => saveInlineRename(conversation)}
+                  onChange={(event) => setEditingTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      event.currentTarget.blur()
+                    }
+                    if (event.key === 'Escape') {
+                      setEditingConversationId(null)
+                      setEditingTitle('')
+                    }
+                  }}
+                />
+                <small className="model-badge">{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
+              </div>
+            ) : (
+              <button className="history-item" type="button" onClick={() => openConversation(conversation)}>
+                <span className="history-title">
+                  <span>{displayConversationTitle(conversation.title)}</span>
+                  {isGeneratingConversation && <InlineGeneratingIndicator />}
+                  {isUnread && !isGeneratingConversation && <span className="notification-dot" aria-label="Reponse prete"></span>}
+                </span>
+                <small className="model-badge">{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
+              </button>
+            )}
             <ConversationMenu
               id={`conversation-${conversation.id}`}
               isOpen={openMenuId === conversation.id}
@@ -1621,7 +1672,7 @@ function requestErrorMessage(error, fallback) {
 function friendlyGenerationError(error) {
   const rawMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : ''
   if (/litellm|stream|streaming|fetch|network|failed/i.test(rawMessage)) {
-    return 'Le modele est temporairement indisponible. Veuillez reessayer.'
+    return 'Le modele met trop de temps a repondre ou est indisponible. Veuillez reessayer.'
   }
   return rawMessage.trim() || 'La generation a echoue. Veuillez reessayer.'
 }
@@ -2051,7 +2102,7 @@ function extractSseData(lines, preserveWhitespace = false) {
     .filter((line) => line.startsWith('data:'))
     .map((line) => {
       const value = line.slice(5).replace(/\r$/, '')
-      if (preserveWhitespace) return value.startsWith(' ') ? value.slice(1) : value
+      if (preserveWhitespace) return value
       return value.startsWith(' ') ? value.slice(1) : value.trim()
     })
     .join('\n')

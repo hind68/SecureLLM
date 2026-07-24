@@ -105,10 +105,11 @@
 }
 
 .model-gallery {
-  width: min(920px, calc(100vw - 48px));
-  max-height: min(720px, calc(100vh - 56px));
-  overflow-y: auto;
-  border: 1px solid var(--border-subtle);
+  width: fit-content;
+  max-width: calc(100vw - 48px);
+  height: auto;
+  overflow-x: auto;
+  border: 1px solid #d1d5db;
   border-radius: 24px;
   background:
     radial-gradient(circle at 20% 12%, rgba(158, 215, 255, 0.19), transparent 34%),
@@ -116,7 +117,7 @@
     rgba(255, 255, 255, 0.94);
   box-shadow: 0 24px 70px rgba(36, 45, 60, 0.14);
   backdrop-filter: blur(16px);
-  padding: 22px;
+  padding: 32px;
 }
 
 .model-gallery-header {
@@ -124,7 +125,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
 }
 
 .model-gallery-header > div > span {
@@ -191,24 +192,36 @@
 
 .model-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, 240px);
+  justify-content: center;
+  gap: 24px;
 }
 
 .model-card {
-  min-width: 0;
+  width: 240px;
+  min-width: 220px;
+  height: auto;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
   box-shadow: 0 12px 34px rgba(35, 44, 58, 0.06);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 14px;
-  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.model-card:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
 }
 
 .model-card-visual {
-  height: 78px;
+  width: 100%;
+  height: 100px;
+  flex-shrink: 0;
   border-radius: 15px;
   display: grid;
   place-items: center;
@@ -217,6 +230,7 @@
 .model-card-logo {
   width: min(132px, 82%);
   height: 58px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
 }
@@ -266,7 +280,9 @@
 }
 
 .model-card-copy {
-  display: grid;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: 7px;
 }
 
@@ -290,25 +306,28 @@
 
 .model-card p {
   margin: 0;
-  color: #676767;
+  color: #6b7280;
   font-size: 13px;
   line-height: 1.45;
 }
 
 .model-card > button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 999px;
-  background: #202020;
-  color: #ffffff;
+  min-height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #1f2937;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 550;
+  margin-top: auto;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .model-card > button:hover {
-  background: #000000;
+  border-color: #d1d5db;
+  background: #e5e7eb;
 }
 
 .model-card > button:disabled {
@@ -490,8 +509,8 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background-color: rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(2px);
+  background-color: rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(1.5px);
   display: flex;
   justify-content: center;
   padding: 24px;
@@ -799,25 +818,54 @@
   white-space: nowrap;
 }
 
+.history-title-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.5;
+  margin: 0;
+  outline: none !important;
+  padding: 0;
+}
+
+.history-title-input:focus,
+.history-title-input:focus-visible {
+  background-color: #f3f4f6;
+  border: none !important;
+  border-bottom: 1px dashed #9ca3af !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .inline-generating {
-  height: 12px;
+  height: 10px;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1.8px;
   flex: 0 0 auto;
+  transform: translateY(1.5px);
 }
 
 .notification-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #b77955;
+  display: inline-block;
   flex: 0 0 auto;
+  transform: translateY(1.5px);
 }
 
 .inline-generating span {
-  width: 3px;
-  height: 3px;
+  width: 2.6px;
+  height: 2.6px;
   border-radius: 999px;
   background: #9ca3af;
   animation: inline-generating-pulse 900ms ease-in-out infinite;
@@ -1221,6 +1269,8 @@
   font-size: 15.5px;
   line-height: 1.7;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .markdown-body[dir="rtl"] {
@@ -1876,19 +1926,36 @@
   padding: 20px;
 }
 
+.decision-backdrop {
+  background: rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(1.5px);
+}
+
 .modal-backdrop {
   z-index: 180;
-  background: rgba(18, 24, 35, 0.34);
-  backdrop-filter: blur(9px);
+  background: rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(1.5px);
 }
 
 .decision-box,
 .confirm-modal {
   width: min(470px, 100%);
+  border: 1px solid #d1d5db;
   border-radius: 16px;
   background: #ffffff;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   padding: 22px;
+}
+
+.decision-box {
+  width: min(420px, 100%);
+}
+
+.confirm-modal {
+  width: min(380px, 100%);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
 }
 
 .decision-box h2,
@@ -1910,6 +1977,20 @@
   gap: 9px;
 }
 
+.decision-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
 .decision-actions button,
 .confirm-modal-actions button {
   min-height: 42px;
@@ -1922,18 +2003,55 @@
   font-weight: 700;
 }
 
+.decision-actions button {
+  min-height: 34px;
+  border-radius: 8px;
+  background: transparent;
+  color: #374151;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.decision-actions button:hover {
+  background: #f3f4f6;
+}
+
+.confirm-modal-actions button {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .decision-actions .secondary,
 .confirm-modal-actions .secondary {
   background: #eeeeeb;
   color: #222222;
 }
 
-.confirm-modal-actions {
-  grid-template-columns: 1fr 1fr;
+.decision-actions .secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.confirm-modal-actions .secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.confirm-modal-actions .secondary:hover {
+  background: #e5e7eb;
 }
 
 .confirm-modal-actions .danger {
-  background: #b42318;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.confirm-modal-actions .danger:hover {
+  background: #b91c1c;
 }
 
 button:disabled,
@@ -1993,6 +2111,12 @@ select:focus {
 .search-modal-input:focus-visible {
   border: 0 !important;
   border-bottom: 1px solid #d1d5db !important;
+}
+
+.composer:focus-within {
+  outline: none !important;
+  border-color: var(--border-subtle) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
 }
 
 .mobile-overlay {
@@ -2298,39 +2422,16 @@ select:focus {
 
 .recent-section .history-heading {
   flex-shrink: 0;
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 4px 6px 8px;
+  min-height: 0;
+  display: block;
+  margin-bottom: 12px;
+  padding: 2px 4px 0 8px;
 }
 
 .recent-section .history-heading span {
   color: #1f1f1f;
   font-size: 14px;
   font-weight: 740;
-}
-
-.recent-section .history-heading button {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  margin-right: -4px;
-}
-
-.recent-section .history-heading button:hover {
-  background: #f1f1f1;
-}
-
-.recent-section .history-heading img {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
 }
 
 .recent-section .filters {
@@ -2839,9 +2940,14 @@ select:focus {
 
   .model-gallery {
     width: min(100%, calc(100vw - 24px));
-    max-height: calc(100vh - 32px);
+    max-width: calc(100vw - 24px);
+    overflow-y: auto;
     border-radius: 18px;
-    padding: 16px;
+    padding: 20px;
+  }
+
+  .model-gallery-header {
+    margin-bottom: 18px;
   }
 
   .model-gallery-header h2 {
@@ -2849,6 +2955,11 @@ select:focus {
   }
 
   .model-card-grid {
-    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .model-card {
+    width: 100%;
+    min-width: 0;
   }
 }

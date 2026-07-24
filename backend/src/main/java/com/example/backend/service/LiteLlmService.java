@@ -90,6 +90,7 @@ public class LiteLlmService {
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .timeout(Duration.ofSeconds(60))
                 .map(this::extractStreamingToken)
                 .filter(token -> !token.isEmpty())
                 .subscribe(onToken, onError, onComplete);
@@ -114,13 +115,16 @@ public class LiteLlmService {
     private String extractStreamingToken(String chunk) {
         StringBuilder token = new StringBuilder();
         for (String line : chunk.split("\\R")) {
-            String normalized = line.trim();
-            if (normalized.isBlank() || normalized.equals("data: [DONE]") || normalized.equals("[DONE]")) {
+            if (line.isEmpty() || line.equals("data: [DONE]") || line.equals("[DONE]")) {
                 continue;
             }
 
+            String normalized = line;
             if (normalized.startsWith("data:")) {
-                normalized = normalized.substring(5).trim();
+                normalized = normalized.substring(5);
+                if (normalized.startsWith(" ") && normalized.startsWith("{", 1)) {
+                    normalized = normalized.substring(1);
+                }
             }
 
             token.append(extractContentField(normalized));
