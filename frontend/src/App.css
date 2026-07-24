@@ -836,12 +836,10 @@
   80%,
   100% {
     opacity: 0.35;
-    transform: translateY(0);
   }
 
   40% {
     opacity: 1;
-    transform: translateY(-2px);
   }
 }
 
@@ -2029,12 +2027,11 @@ select:focus {
   }
 
   .search-modal {
+    --modal-x-padding: 14px;
     border-radius: 16px;
-    padding: 14px;
   }
 
   .search-modal-input {
-    min-height: 50px;
     font-size: 16px;
   }
 
@@ -2840,12 +2837,9 @@ select:focus {
     box-shadow: none;
   }
 
-  .model-gallery,
-  .sidebar-closed .model-gallery {
-    top: 62px;
-    right: 12px;
-    bottom: 16px;
-    left: calc(var(--sidebar-closed-width) + 12px);
+  .model-gallery {
+    width: min(100%, calc(100vw - 24px));
+    max-height: calc(100vh - 32px);
     border-radius: 18px;
     padding: 16px;
   }
