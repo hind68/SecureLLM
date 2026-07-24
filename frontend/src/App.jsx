@@ -66,6 +66,7 @@ function App() {
   const [modelFilter, setModelFilter] = useState('')
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState(null)
   const [messages, setMessages] = useState([])
@@ -77,17 +78,17 @@ function App() {
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
-  const [isSending, setIsSending] = useState(false)
+  const [generatingConversationId, setGeneratingConversationId] = useState(null)
+  const [unreadConversationIds, setUnreadConversationIds] = useState(() => new Set())
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) !== 'false')
   const [activeView, setActiveView] = useState('chat')
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
   const [collapsedPanel, setCollapsedPanel] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [modelDecision, setModelDecision] = useState(null)
+  const [pendingDeleteConversation, setPendingDeleteConversation] = useState(null)
   const [isLastBlockVisible, setIsLastBlockVisible] = useState(true)
   const [isComposerMaxed, setIsComposerMaxed] = useState(false)
   const [isComposerTransitioning, setIsComposerTransitioning] = useState(false)
@@ -95,6 +96,7 @@ function App() {
   const messagesRef = useRef(null)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+  const searchInputRef = useRef(null)
   const composerRef = useRef(null)
   const composerBeforeRectRef = useRef(null)
   const composerTimerRef = useRef(null)
@@ -102,10 +104,16 @@ function App() {
   const shouldAutoScrollRef = useRef(true)
   const scrollFrameRef = useRef(null)
   const activeConversationRestoreRef = useRef(false)
+  const activeConversationIdRef = useRef(null)
+  const generationAbortRef = useRef(null)
+  const messageCacheRef = useRef(new Map())
+  const tokenQueuesRef = useRef(new Map())
+  const tokenTimersRef = useRef(new Map())
 
   const activeModelAlias = activeConversation?.modelAlias || selectedModel
   const activeModel = models.find((model) => model.alias === activeModelAlias)
-  const canSend = Boolean(activeModelAlias && draft.trim() && !isSending)
+  const isGenerating = Boolean(generatingConversationId)
+  const canSend = Boolean(activeModelAlias && draft.trim() && !isGenerating)
   const hasActiveMessages = messages.length > 0
   const isModelsView = activeView === 'models'
 
@@ -146,8 +154,6 @@ function App() {
 
   const closeSidebarPanels = useCallback(() => {
     closeTransientMenus()
-    setIsFilterOpen(false)
-    setIsAdvancedFiltersOpen(false)
     setActiveView('chat')
   }, [closeTransientMenus])
 
@@ -166,6 +172,15 @@ function App() {
   const showNotice = useCallback((message) => {
     setChatError('')
     setChatNotice(message)
+  }, [])
+
+  const markConversationRead = useCallback((conversationId) => {
+    setUnreadConversationIds((current) => {
+      if (!current.has(conversationId)) return current
+      const next = new Set(current)
+      next.delete(conversationId)
+      return next
+    })
   }, [])
 
   const loadModels = useCallback(async () => {
@@ -252,6 +267,7 @@ function App() {
       if (event.key === 'Escape') {
         closeTransientMenus()
         setModelDecision(null)
+        setIsSearchModalOpen(false)
         setActiveView('chat')
         setChatError('')
         setChatNotice('')
@@ -315,6 +331,16 @@ function App() {
     resizeTextarea()
   }, [draft, resizeTextarea])
 
+  useEffect(() => {
+    if (!isSearchModalOpen) return
+    const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 180)
+    return () => window.clearTimeout(timeout)
+  }, [isSearchModalOpen])
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversation?.id || null
+  }, [activeConversation?.id])
+
   useEffect(() => () => {
     if (scrollFrameRef.current) {
       cancelAnimationFrame(scrollFrameRef.current)
@@ -322,28 +348,39 @@ function App() {
     if (composerTimerRef.current) {
       window.clearTimeout(composerTimerRef.current)
     }
+    generationAbortRef.current?.abort()
+    tokenTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    tokenTimersRef.current.clear()
   }, [showError])
 
   const openConversation = useCallback(async (conversation) => {
-    if (isSending) return
     try {
       setChatError('')
       closeTransientMenus()
       setActiveConversation(conversation)
+      markConversationRead(conversation.id)
       setSelectedModel(conversation.modelAlias)
       saveLastModel(conversation.modelAlias)
       saveActiveConversationId(conversation.id)
       setActiveView('chat')
       setIsLastBlockVisible(true)
       shouldAutoScrollRef.current = true
+      const cachedMessages = messageCacheRef.current.get(conversation.id)
+      if (cachedMessages) {
+        setMessages(cachedMessages)
+        closeSidePanelOnMobile()
+        return
+      }
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages`)
       if (!response.ok) throw new Error('messages')
-      setMessages(await response.json())
+      const nextMessages = await response.json()
+      messageCacheRef.current.set(conversation.id, nextMessages)
+      setMessages(nextMessages)
       closeSidePanelOnMobile()
     } catch {
       showError('Impossible de reprendre cette conversation.')
     }
-  }, [closeSidePanelOnMobile, closeTransientMenus, isSending, showError])
+  }, [closeSidePanelOnMobile, closeTransientMenus, markConversationRead, showError])
 
   useEffect(() => {
     if (activeConversationRestoreRef.current || !hasLoadedHistory || showArchived || search.trim() || modelFilter) return
@@ -376,10 +413,9 @@ function App() {
     }
 
     void restoreActiveConversation()
-  }, [conversations, hasLoadedHistory, isSending, modelFilter, openConversation, search, showArchived])
+  }, [conversations, hasLoadedHistory, modelFilter, openConversation, search, showArchived])
 
   function newConversation(modelAlias = selectedModel) {
-    if (isSending) return
     setActiveConversation(null)
     setMessages([])
     setDraft('')
@@ -402,6 +438,7 @@ function App() {
     if (!response.ok) throw new Error('create conversation')
     const conversation = await response.json()
     setActiveConversation(conversation)
+    markConversationRead(conversation.id)
     setSelectedModel(conversation.modelAlias)
     saveLastModel(conversation.modelAlias)
     saveActiveConversationId(conversation.id)
@@ -416,6 +453,10 @@ function App() {
 
   async function sendMessage(event) {
     event.preventDefault()
+    if (isGenerating) {
+      stopGeneration()
+      return
+    }
     const prompt = draft.trim()
     if (!prompt) {
       showError('Le message ne peut pas etre vide.')
@@ -426,19 +467,15 @@ function App() {
     if (!hasActiveMessages && composerRef.current) {
       composerBeforeRectRef.current = composerRef.current.getBoundingClientRect()
     }
-    setIsSending(true)
     setDraft('')
     setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
 
     try {
       const conversation = await ensureConversation(prompt)
-      await streamMessage(conversation, prompt)
-      await loadConversations()
-    } catch {
-      showError('La requete a echoue. Verifiez Spring Boot, LiteLLM et le provider.')
-    } finally {
-      setIsSending(false)
+      void streamMessage(conversation, prompt)
+    } catch (error) {
+      showError(friendlyGenerationError(error))
     }
   }
 
@@ -446,8 +483,11 @@ function App() {
     const modelName = modelDisplayName(conversation.modelAlias)
     const localUserId = nextLocalId('local-user')
     const localAssistantId = nextLocalId('local-assistant')
+    const abortController = new AbortController()
+    generationAbortRef.current = abortController
+    setGeneratingConversationId(conversation.id)
 
-    setMessages((current) => [
+    updateConversationMessages(conversation.id, (current) => [
       ...current,
       { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt },
       {
@@ -460,33 +500,63 @@ function App() {
       },
     ])
 
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages/stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: prompt }),
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/messages/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: prompt }),
+        signal: abortController.signal,
+      })
 
-    if (!response.ok || !response.body) throw new Error('stream')
+      if (!response.ok || !response.body) throw new Error('Erreur pendant le streaming LiteLLM')
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
 
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const events = buffer.split('\n\n')
-      buffer = events.pop() || ''
-      events.forEach((rawEvent) => handleSseEvent(rawEvent, localUserId, localAssistantId))
-    }
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+        events.forEach((rawEvent) => handleSseEvent(rawEvent, conversation.id, localUserId, localAssistantId))
+      }
 
-    if (buffer) {
-      handleSseEvent(buffer, localUserId, localAssistantId)
+      if (buffer) {
+        handleSseEvent(buffer, conversation.id, localUserId, localAssistantId)
+      }
+      await loadConversations()
+      notifyConversationReady(conversation.id)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        updateConversationMessages(conversation.id, (current) =>
+          current.map((item) =>
+            item.id === localAssistantId
+              ? { ...item, status: 'ECHEC', content: item.content || 'Generation interrompue.' }
+              : item,
+          ),
+        )
+        return
+      }
+      const message = friendlyGenerationError(error)
+      updateConversationMessages(conversation.id, (current) =>
+        current.map((item) =>
+          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: message } : item,
+        ),
+      )
+      if (activeConversationIdRef.current === conversation.id) showError(message)
+      notifyConversationReady(conversation.id)
+    } finally {
+      flushQueuedTokens(localAssistantId, conversation.id)
+      if (generationAbortRef.current === abortController) {
+        generationAbortRef.current = null
+      }
+      setGeneratingConversationId(null)
     }
   }
 
-  function handleSseEvent(rawEvent, localUserId, localAssistantId) {
+  function handleSseEvent(rawEvent, conversationId, localUserId, localAssistantId) {
     const lines = rawEvent.split('\n')
     const event = lines.find((line) => line.startsWith('event:'))?.slice(6).trim()
     const data = extractSseData(lines, event === 'token')
@@ -496,7 +566,7 @@ function App() {
       const parsed = parseJson(jsonData)
       if (!parsed) return
       const targetId = parsed.role === 'USER' ? localUserId : localAssistantId
-      setMessages((current) =>
+      updateConversationMessages(conversationId, (current) =>
         current.map((item) =>
           item.id === targetId
             ? { ...item, ...parsed, id: targetId, serverId: parsed.id }
@@ -506,35 +576,92 @@ function App() {
     }
 
     if (event === 'token') {
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === localAssistantId ? { ...item, content: `${item.content}${data}` } : item,
-        ),
-      )
+      enqueueToken(conversationId, localAssistantId, data)
     }
 
     if (event === 'done') {
       const parsed = parseJson(jsonData)
-      setMessages((current) =>
+      updateConversationMessages(conversationId, (current) =>
         current.map((item) =>
           item.id === localAssistantId
-            ? { ...item, id: parsed?.messageId || item.id, status: 'TERMINE', content: parsed?.content ?? item.content }
+            ? { ...item, serverId: parsed?.messageId || item.serverId, status: 'TERMINE' }
             : item,
         ),
       )
     }
 
     if (event === 'error') {
-      setMessages((current) =>
+      const message = friendlyGenerationError(jsonData)
+      updateConversationMessages(conversationId, (current) =>
         current.map((item) =>
-          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || jsonData } : item,
+          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || message } : item,
         ),
+      )
+      if (activeConversationIdRef.current === conversationId) showError(message)
+    }
+  }
+
+  function updateConversationMessages(conversationId, updater) {
+    const currentMessages = messageCacheRef.current.get(conversationId) || []
+    const nextMessages = updater(currentMessages)
+    messageCacheRef.current.set(conversationId, nextMessages)
+    if (activeConversationIdRef.current === conversationId) {
+      setMessages(nextMessages)
+    }
+  }
+
+  function enqueueToken(conversationId, assistantId, token) {
+    if (!token) return
+    tokenQueuesRef.current.set(assistantId, `${tokenQueuesRef.current.get(assistantId) || ''}${token}`)
+    if (!tokenTimersRef.current.has(assistantId)) {
+      tokenTimersRef.current.set(
+        assistantId,
+        window.setTimeout(() => flushQueuedTokens(assistantId, conversationId), 18),
       )
     }
   }
 
+  function flushQueuedTokens(assistantId, conversationId) {
+    const timer = tokenTimersRef.current.get(assistantId)
+    if (timer) {
+      window.clearTimeout(timer)
+      tokenTimersRef.current.delete(assistantId)
+    }
+    const queued = tokenQueuesRef.current.get(assistantId) || ''
+    if (!queued) return
+    const chunk = queued.slice(0, 8)
+    const rest = queued.slice(8)
+    tokenQueuesRef.current.set(assistantId, rest)
+    updateConversationMessages(conversationId, (current) =>
+      current.map((item) =>
+        item.id === assistantId ? { ...item, content: `${item.content}${chunk}` } : item,
+      ),
+    )
+    if (rest) {
+      tokenTimersRef.current.set(
+        assistantId,
+        window.setTimeout(() => flushQueuedTokens(assistantId, conversationId), 18),
+      )
+    } else {
+      tokenQueuesRef.current.delete(assistantId)
+    }
+  }
+
+  function notifyConversationReady(conversationId) {
+    if (activeConversationIdRef.current === conversationId) return
+    setUnreadConversationIds((current) => {
+      const next = new Set(current)
+      next.add(conversationId)
+      return next
+    })
+  }
+
+  function stopGeneration() {
+    generationAbortRef.current?.abort()
+  }
+
   async function renameConversation(conversation = activeConversation) {
-    if (!conversation || isSending) return
+    if (!conversation || isGenerating) return
     const title = window.prompt('Nouveau titre', conversation.title)
     if (!title?.trim()) return
 
@@ -555,7 +682,7 @@ function App() {
   }
 
   async function archiveConversation(conversation = activeConversation) {
-    if (!conversation || isSending) return
+    if (!conversation || isGenerating) return
     try {
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('archive')
@@ -573,7 +700,7 @@ function App() {
   }
 
   async function restoreConversation(conversation) {
-    if (!conversation || isSending) return
+    if (!conversation || isGenerating) return
     try {
       const response = await fetch(`${API_BASE_URL}/conversations/${conversation.id}/restore`, { method: 'PATCH' })
       if (!response.ok) throw new Error(await requestStatusMessage(response, 'Impossible de desarchiver la conversation.'))
@@ -594,13 +721,19 @@ function App() {
   }
 
   async function deleteConversation(conversation = activeConversation) {
-    if (!conversation || isSending) return
+    if (!conversation || isGenerating) return
     if (!conversation.id) {
       showError('Impossible de supprimer cette conversation: identifiant manquant.')
       logDevelopmentError('delete conversation missing id', conversation)
       return
     }
-    if (!window.confirm('Supprimer definitivement cette conversation ?')) return
+    setPendingDeleteConversation(conversation)
+    closeMenus()
+  }
+
+  async function confirmDeleteConversation() {
+    const conversation = pendingDeleteConversation
+    if (!conversation || isGenerating) return
     const deleteUrl = `${API_BASE_URL}/conversations/${conversation.id}/permanent`
     try {
       const response = await fetch(deleteUrl, { method: 'DELETE' })
@@ -622,6 +755,7 @@ function App() {
       }
       clearActiveConversationId(conversation.id)
       closeMenus()
+      setPendingDeleteConversation(null)
       showNotice('Conversation supprimee.')
       await loadConversations()
     } catch (error) {
@@ -631,7 +765,7 @@ function App() {
 
   async function selectModel(alias) {
     setIsModelMenuOpen(false)
-    if (isSending) return
+    if (isGenerating) return
     if (!activeConversation) {
       setSelectedModel(alias)
       saveLastModel(alias)
@@ -708,9 +842,6 @@ function App() {
     setIsHeaderMenuOpen(false)
     setIsModelMenuOpen(false)
     setIsAccountMenuOpen(false)
-    if (panel !== 'search') {
-      setIsFilterOpen(false)
-    }
     setCollapsedPanel((current) => (current === panel ? null : panel))
   }
 
@@ -767,20 +898,18 @@ function App() {
               <span>Nouvelle conversation</span>
             </button>
             <button
-              className={isFilterOpen || collapsedPanel === 'search' ? 'active' : ''}
+              className={isSearchModalOpen ? 'active' : ''}
               type="button"
               title="Rechercher"
               aria-label="Rechercher"
               onClick={() => {
+                setIsSearchModalOpen(true)
                 if (isSidebarOpen) {
                   setIsAccountMenuOpen(false)
                   setActiveView('chat')
                   setCollapsedPanel(null)
-                  setIsFilterOpen((current) => !current)
                 } else {
-                  setShowArchived(false)
-                  setIsFilterOpen(true)
-                  toggleCollapsedPanel('search')
+                  setCollapsedPanel(null)
                 }
               }}
             >
@@ -797,8 +926,6 @@ function App() {
               onClick={() => {
                 closeTransientMenus()
                 setIsAccountMenuOpen(false)
-                setIsFilterOpen(false)
-                setIsAdvancedFiltersOpen(false)
                 setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
               }}
             >
@@ -819,14 +946,10 @@ function App() {
                 setIsAccountMenuOpen(false)
                 setActiveView('chat')
                 setCollapsedPanel(null)
-                setIsFilterOpen(false)
-                setIsAdvancedFiltersOpen(false)
                 setModelFilter('')
                 setSearch('')
                 setOpenMenuId(null)
               } else {
-                setIsAdvancedFiltersOpen(false)
-                setIsFilterOpen(true)
                 toggleCollapsedPanel('history')
               }
             }}
@@ -840,17 +963,13 @@ function App() {
 
         <section className="recent-section">
           <div className="history-heading">
-            <span>{showArchived ? 'Archives' : 'Recents'}</span>
+            <span>Recents</span>
             {isSidebarOpen && (
               <button
                 type="button"
                 aria-label="Filtres"
                 onClick={() => {
-                  setIsFilterOpen((current) => {
-                    const next = !current
-                    setIsAdvancedFiltersOpen(next)
-                    return next
-                  })
+                  setIsSearchModalOpen(true)
                 }}
               >
                 <img src="/assets/filter.png" alt="" />
@@ -858,20 +977,7 @@ function App() {
             )}
           </div>
 
-          {isFilterOpen && (
-            <SearchPanel
-              hideFilterButton
-              isAdvancedFiltersOpen={isAdvancedFiltersOpen}
-              modelFilter={modelFilter}
-              models={models}
-              search={search}
-              setIsAdvancedFiltersOpen={setIsAdvancedFiltersOpen}
-              setModelFilter={setModelFilter}
-              setSearch={setSearch}
-              setShowArchived={setShowArchived}
-              showArchived={showArchived}
-            />
-          )}
+          <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
 
           <HistoryList
             activeConversation={activeConversation}
@@ -888,6 +994,8 @@ function App() {
             renameConversation={renameConversation}
             restoreConversation={restoreConversation}
             showArchived={showArchived}
+            generatingConversationId={generatingConversationId}
+            unreadConversationIds={unreadConversationIds}
           />
         </section>
 
@@ -942,17 +1050,7 @@ function App() {
           </div>
 
           {(collapsedPanel === 'search' || collapsedPanel === 'history') && (
-            <SearchPanel
-              isAdvancedFiltersOpen={isAdvancedFiltersOpen}
-              modelFilter={modelFilter}
-              models={models}
-              search={search}
-              setIsAdvancedFiltersOpen={setIsAdvancedFiltersOpen}
-              setModelFilter={setModelFilter}
-              setSearch={setSearch}
-              setShowArchived={setShowArchived}
-              showArchived={showArchived}
-            />
+            <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
           )}
           <HistoryList
             activeConversation={activeConversation}
@@ -972,8 +1070,27 @@ function App() {
             renameConversation={renameConversation}
             restoreConversation={restoreConversation}
             showArchived={showArchived}
+            generatingConversationId={generatingConversationId}
+            unreadConversationIds={unreadConversationIds}
           />
         </div>
+      )}
+
+      {isSearchModalOpen && (
+        <SearchModal
+          inputRef={searchInputRef}
+          conversations={conversations}
+          isLoadingHistory={isLoadingHistory}
+          modelFilter={modelFilter}
+          models={models}
+          onClose={() => setIsSearchModalOpen(false)}
+          openConversation={openConversation}
+          search={search}
+          setModelFilter={setModelFilter}
+          setSearch={setSearch}
+          setShowArchived={setShowArchived}
+          showArchived={showArchived}
+        />
       )}
 
       <main className={`chat-main ${hasActiveMessages ? 'conversation-mode' : 'welcome-mode'}`}>
@@ -987,7 +1104,7 @@ function App() {
                   setIsAccountMenuOpen(false)
                   setIsModelMenuOpen((current) => !current)
                 }}
-                disabled={isSending || isLoadingModels}
+                disabled={isGenerating || isLoadingModels}
               >
                 <span>{activeModel?.displayName || 'Modele'}</span>
                 <span className="model-arrow" aria-hidden="true"></span>
@@ -1022,47 +1139,54 @@ function App() {
         </header>
 
         {isModelsView && (
-          <section className="model-gallery" aria-labelledby="model-gallery-title" data-menu-root>
-            <div className="model-gallery-header">
-              <div>
-                <span>Catalogue</span>
-                <h2 id="model-gallery-title">Explorer les modeles</h2>
+          <div className="modal-overlay model-gallery-overlay" role="presentation" onMouseDown={() => setActiveView('chat')}>
+            <section
+              className="model-gallery"
+              aria-labelledby="model-gallery-title"
+              data-menu-root
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="model-gallery-header">
+                <div>
+                  <span>Catalogue</span>
+                  <h2 id="model-gallery-title">Explorer les modeles</h2>
+                </div>
+                <button className="close-button" type="button" aria-label="Fermer l explorateur" onClick={() => setActiveView('chat')}>
+                  <span className="close-icon" aria-hidden="true"></span>
+                </button>
               </div>
-              <button className="close-button" type="button" aria-label="Fermer l explorateur" onClick={() => setActiveView('chat')}>
-                <span className="close-icon" aria-hidden="true"></span>
-              </button>
-            </div>
 
-            <div className="model-card-grid">
-              {models.map((model) => {
-                const meta = modelCardMeta(model.alias)
-                return (
-                  <article className="model-card" key={model.alias}>
-                    <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
-                      <ModelLogo alias={model.alias} className="model-card-logo" fallback={meta.initials} />
-                    </div>
-                    <div className="model-card-copy">
-                      <div className="model-card-topline">
-                        <span>{modelProviderName(model.alias)}</span>
+              <div className="model-card-grid">
+                {models.map((model) => {
+                  const meta = modelCardMeta(model.alias)
+                  return (
+                    <article className="model-card" key={model.alias}>
+                      <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
+                        <ModelLogo alias={model.alias} className="model-card-logo" fallback={meta.initials} />
                       </div>
-                      <h3>{model.displayName}</h3>
-                      <p>{meta.description}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        selectModel(model.alias)
-                        setActiveView('chat')
-                      }}
-                      disabled={isSending}
-                    >
-                      Utiliser ce modele
-                    </button>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
+                      <div className="model-card-copy">
+                        <div className="model-card-topline">
+                          <span>{modelProviderName(model.alias)}</span>
+                        </div>
+                        <h3>{model.displayName}</h3>
+                        <p>{meta.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selectModel(model.alias)
+                          setActiveView('chat')
+                        }}
+                        disabled={isGenerating}
+                      >
+                        Utiliser ce modele
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
         )}
 
         <section
@@ -1104,20 +1228,26 @@ function App() {
 
         <form
           ref={composerRef}
-          className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-welcome composer-center'} ${isComposerMaxed ? 'composer-maxed' : ''}`}
+          className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-welcome composer-center'} ${isComposerMaxed ? 'composer-maxed' : ''} ${isGenerating ? 'is-generating' : ''}`}
           onSubmit={sendMessage}
         >
           <textarea
             ref={textareaRef}
-            disabled={isSending}
+            disabled={isGenerating}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Poser une question"
             rows={1}
             value={draft}
           />
-          <button type="submit" aria-label="Envoyer" disabled={!canSend}>
-            {isSending ? <DotsIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
+          <button
+            className={isGenerating ? 'stop-button' : ''}
+            type={isGenerating ? 'button' : 'submit'}
+            aria-label={isGenerating ? 'Interrompre la generation' : 'Envoyer'}
+            disabled={!isGenerating && !canSend}
+            onClick={isGenerating ? stopGeneration : undefined}
+          >
+            {isGenerating ? <StopIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
           </button>
         </form>
 
@@ -1156,6 +1286,17 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingDeleteConversation && (
+        <ConfirmModal
+          title="Supprimer la conversation ?"
+          message={`La conversation "${displayConversationTitle(pendingDeleteConversation.title)}" sera supprimee definitivement.`}
+          confirmLabel="Confirmer"
+          cancelLabel="Annuler"
+          onCancel={() => setPendingDeleteConversation(null)}
+          onConfirm={confirmDeleteConversation}
+        />
       )}
     </div>
   )
@@ -1209,6 +1350,8 @@ function HistoryList({
   renameConversation,
   restoreConversation,
   showArchived,
+  generatingConversationId,
+  unreadConversationIds,
 }) {
   return (
     <>
@@ -1222,10 +1365,17 @@ function HistoryList({
       <div className="history">
         {isLoadingHistory && <div className="history-empty">Chargement...</div>}
         {!isLoadingHistory && !historyError && conversations.length === 0 && <div className="history-empty">Aucune conversation</div>}
-        {conversations.map((conversation) => (
-          <div className={`history-row ${activeConversation?.id === conversation.id ? 'active' : ''}`} key={conversation.id}>
+        {conversations.map((conversation) => {
+          const isGeneratingConversation = generatingConversationId === conversation.id
+          const isUnread = unreadConversationIds.has(conversation.id)
+          return (
+          <div className={`history-row ${activeConversation?.id === conversation.id ? 'active' : ''} ${isUnread ? 'unread' : ''}`} key={conversation.id}>
             <button className="history-item" type="button" onClick={() => openConversation(conversation)}>
-              <span>{displayConversationTitle(conversation.title)}</span>
+              <span className="history-title">
+                <span>{displayConversationTitle(conversation.title)}</span>
+                {isGeneratingConversation && <InlineGeneratingIndicator />}
+                {isUnread && !isGeneratingConversation && <span className="notification-dot" aria-label="Reponse prete"></span>}
+              </span>
               <small className="model-badge">{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
             </button>
             <ConversationMenu
@@ -1241,48 +1391,165 @@ function HistoryList({
               onRename={() => renameConversation(conversation)}
             />
           </div>
-        ))}
+          )
+        })}
       </div>
     </>
   )
 }
 
-function SearchPanel({
-  hideFilterButton = false,
-  isAdvancedFiltersOpen,
+function ArchiveTabs({ showArchived, setShowArchived }) {
+  return (
+    <div className="archive-tabs" role="tablist" aria-label="Filtrer les conversations">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!showArchived}
+        className={!showArchived ? 'active' : ''}
+        onClick={() => setShowArchived(false)}
+      >
+        Actives
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={showArchived}
+        className={showArchived ? 'active' : ''}
+        onClick={() => setShowArchived(true)}
+      >
+        Archives
+      </button>
+    </div>
+  )
+}
+
+function SearchModal({
+  conversations,
+  inputRef,
+  isLoadingHistory,
   modelFilter,
   models,
+  onClose,
+  openConversation,
   search,
-  setIsAdvancedFiltersOpen,
   setModelFilter,
   setSearch,
   setShowArchived,
   showArchived,
 }) {
-  return (
-    <div className="search-panel">
-      <div className={`search-line ${hideFilterButton ? 'without-filter-button' : ''}`}>
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher" />
-        {!hideFilterButton && (
-          <button type="button" aria-label="Afficher les filtres avances" onClick={() => setIsAdvancedFiltersOpen((current) => !current)}>
-            <img src="/assets/filter.png" alt="" />
-          </button>
-        )}
-      </div>
+  const visibleConversations = modelFilter
+    ? conversations.filter((conversation) => conversation.modelAlias === modelFilter)
+    : conversations
 
-      {isAdvancedFiltersOpen && (
-        <div className="advanced-filters">
-          <select value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
-            <option value="">Tous les modeles</option>
-            {models.map((model) => (
-              <option key={model.alias} value={model.alias}>{model.displayName}</option>
-            ))}
-          </select>
-          <label>
-            <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
-            <span>Archives</span>
-          </label>
+  return (
+    <div className="modal-overlay search-modal-overlay" role="presentation" onMouseDown={onClose}>
+      <section
+        className="search-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="search-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="search-modal-header">
+          <h2 id="search-modal-title">Rechercher</h2>
+          <button type="button" aria-label="Fermer la recherche" onClick={onClose}>
+            <span className="close-icon" aria-hidden="true"></span>
+          </button>
         </div>
+        <input
+          ref={inputRef}
+          className="search-modal-input"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.preventDefault()
+          }}
+          placeholder="Rechercher une conversation"
+        />
+        <div className="search-modal-filters">
+          <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
+          <ModelFilterDropdown modelFilter={modelFilter} models={models} setModelFilter={setModelFilter} />
+        </div>
+        <div className="search-results" role="listbox" aria-label="Resultats de recherche">
+          {isLoadingHistory && <div className="search-result-empty">Recherche...</div>}
+          {!isLoadingHistory && visibleConversations.length === 0 && (
+            <div className="search-result-empty">Aucune conversation trouvee</div>
+          )}
+          {!isLoadingHistory && visibleConversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              type="button"
+              className="search-result-row"
+              role="option"
+              onClick={async () => {
+                await openConversation(conversation)
+                onClose()
+              }}
+            >
+              <span>{displayConversationTitle(conversation.title)}</span>
+              <small>{cleanModelName(conversation.modelDisplayName, conversation.modelAlias)}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function InlineGeneratingIndicator() {
+  return (
+    <span className="inline-generating" aria-label="Generation en cours">
+      <span></span>
+      <span></span>
+      <span></span>
+    </span>
+  )
+}
+
+function ModelFilterDropdown({ modelFilter, models, setModelFilter }) {
+  const [isModelFilterOpen, setIsModelFilterOpen] = useState(false)
+  const activeFilterLabel = models.find((model) => model.alias === modelFilter)?.displayName || 'Tous les modeles'
+
+  return (
+    <div className="custom-dropdown" data-menu-root>
+      <button
+        type="button"
+        className="custom-dropdown-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={isModelFilterOpen}
+        onClick={() => setIsModelFilterOpen((current) => !current)}
+      >
+        <span>{activeFilterLabel}</span>
+        <DownArrowIcon />
+      </button>
+      {isModelFilterOpen && (
+        <ul className="custom-dropdown-menu" role="listbox" aria-label="Filtrer par modele">
+          <li
+            role="option"
+            aria-selected={modelFilter === ''}
+            className={modelFilter === '' ? 'selected' : ''}
+            onClick={() => {
+              setModelFilter('')
+              setIsModelFilterOpen(false)
+            }}
+          >
+            Tous les modeles
+          </li>
+          {models.map((model) => (
+            <li
+              key={model.alias}
+              role="option"
+              aria-selected={modelFilter === model.alias}
+              className={modelFilter === model.alias ? 'selected' : ''}
+              onClick={() => {
+                setModelFilter(model.alias)
+                setIsModelFilterOpen(false)
+              }}
+            >
+              {model.displayName}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -1300,6 +1567,31 @@ function DotsIcon() {
 
 function DownArrowIcon() {
   return <span className="down-arrow-icon" aria-hidden="true"></span>
+}
+
+function StopIcon() {
+  return <span className="stop-icon" aria-hidden="true"></span>
+}
+
+function ConfirmModal({ cancelLabel, confirmLabel, message, onCancel, onConfirm, title }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onCancel}>
+      <div
+        className="confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <h2 id="confirm-modal-title">{title}</h2>
+        <p>{message}</p>
+        <div className="confirm-modal-actions">
+          <button type="button" className="secondary" onClick={onCancel}>{cancelLabel}</button>
+          <button type="button" className="danger" onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 async function deletionErrorMessage(response) {
@@ -1324,6 +1616,14 @@ function requestErrorMessage(error, fallback) {
     return `${fallback} Le backend est inaccessible ou la requete est bloquee par CORS.`
   }
   return error instanceof Error ? error.message : fallback
+}
+
+function friendlyGenerationError(error) {
+  const rawMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : ''
+  if (/litellm|stream|streaming|fetch|network|failed/i.test(rawMessage)) {
+    return 'Le modele est temporairement indisponible. Veuillez reessayer.'
+  }
+  return rawMessage.trim() || 'La generation a echoue. Veuillez reessayer.'
 }
 
 function MessageBubble({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
