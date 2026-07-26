@@ -1,0 +1,270 @@
+import ArchiveTabs from './ArchiveTabs'
+import ConversationList from './ConversationList'
+
+export default function Sidebar({
+  activeConversation,
+  archiveConversation,
+  closeSidebarPanels,
+  closeTransientMenus,
+  collapsedPanel,
+  conversations,
+  deleteConversation,
+  editingConversationId,
+  editingTitle,
+  historyError,
+  isAccountMenuOpen,
+  isModelsView,
+  isSearchModalOpen,
+  isSidebarOpen,
+  isLoadingHistory,
+  loadConversations,
+  newConversation,
+  openConversation,
+  openMenuId,
+  renameConversation,
+  restoreConversation,
+  saveInlineRename,
+  setActiveView,
+  setCollapsedPanel,
+  setEditingConversationId,
+  setEditingTitle,
+  setIsAccountMenuOpen,
+  setIsSearchModalOpen,
+  setIsSidebarOpen,
+  setModelFilter,
+  setOpenMenuId,
+  setSearch,
+  setShowArchived,
+  setShowTabs,
+  showArchived,
+  showTabs,
+  toggleCollapsedPanel,
+  toggleSidebar,
+}) {
+  const historyListProps = {
+    activeConversation,
+    archiveConversation,
+    conversations,
+    deleteConversation,
+    editingConversationId,
+    editingTitle,
+    historyError,
+    isLoadingHistory,
+    loadConversations,
+    openMenuId,
+    renameConversation,
+    restoreConversation,
+    saveInlineRename,
+    setEditingConversationId,
+    setEditingTitle,
+    setIsAccountMenuOpen,
+    setOpenMenuId,
+    showArchived,
+  }
+
+  return (
+    <>
+      {isSidebarOpen && <button className="mobile-overlay" type="button" aria-label="Fermer" onClick={toggleSidebar} />}
+
+      <aside className="sidebar" aria-label="Navigation Synapse" data-menu-root>
+        <div className="sidebar-header">
+          <button
+            className="sidebar-brand"
+            type="button"
+            aria-label={isSidebarOpen ? 'Synapse' : 'Ouvrir la sidebar'}
+            onClick={() => {
+              if (!isSidebarOpen) {
+                closeSidebarPanels()
+                setIsSidebarOpen(true)
+              }
+            }}
+          >
+            <span className="sidebar-logo" aria-hidden="true">
+              <img className="sidebar-logo-default" src="/assets/synapse-logo.png" alt="" />
+              <img className="sidebar-logo-hover" src="/assets/synapse-hover.png" alt="" />
+            </span>
+            <span>Synapse</span>
+          </button>
+          <button
+            className="sidebar-toggle"
+            type="button"
+            title={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
+            aria-label={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
+            aria-expanded={isSidebarOpen}
+            onClick={toggleSidebar}
+          >
+            <img src="/assets/sidebar.png" alt="" />
+          </button>
+        </div>
+
+        <nav className="sidebar-navigation" aria-label="Actions principales">
+          <div className="sidebar-primary-nav">
+            <button type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation" onClick={() => { closeSidebarPanels(); newConversation() }}>
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/new-tab.png" alt="" />
+              </span>
+              <span>Nouvelle conversation</span>
+            </button>
+            <button
+              className={isSearchModalOpen ? 'active' : ''}
+              type="button"
+              title="Rechercher"
+              aria-label="Rechercher"
+              onClick={() => {
+                setIsSearchModalOpen(true)
+                if (isSidebarOpen) {
+                  setIsAccountMenuOpen(false)
+                  setActiveView('chat')
+                  setCollapsedPanel(null)
+                } else {
+                  setCollapsedPanel(null)
+                }
+              }}
+            >
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/search.png" alt="" />
+              </span>
+              <span>Rechercher</span>
+            </button>
+            <button
+              className={isModelsView ? 'active' : ''}
+              type="button"
+              title="Explorer les modeles"
+              aria-label="Explorer les modeles"
+              onClick={() => {
+                closeTransientMenus()
+                setIsAccountMenuOpen(false)
+                setActiveView((current) => (current === 'models' ? 'chat' : 'models'))
+              }}
+            >
+              <span className="sidebar-icon" aria-hidden="true">
+                <img src="/assets/compass.png" alt="" />
+              </span>
+              <span>Explorer les modeles</span>
+            </button>
+          </div>
+          <button
+            className={`recent-nav-button ${collapsedPanel === 'history' ? 'active' : ''}`}
+            type="button"
+            title="Discussions recentes"
+            aria-label="Discussions recentes"
+            onClick={() => {
+              setShowArchived(false)
+              if (isSidebarOpen) {
+                setIsAccountMenuOpen(false)
+                setActiveView('chat')
+                setCollapsedPanel(null)
+                setModelFilter('')
+                setSearch('')
+                setOpenMenuId(null)
+              } else {
+                toggleCollapsedPanel('history')
+              }
+            }}
+          >
+            <span className="sidebar-icon" aria-hidden="true">
+              <img src="/assets/message.png" alt="" />
+            </span>
+            <span>Discussions recentes</span>
+          </button>
+        </nav>
+
+        <section className="recent-section">
+          <div className="history-heading">
+            <span>Recents</span>
+            <button
+              type="button"
+              className="archive-toggle"
+              title={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
+              aria-label={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
+              aria-expanded={showTabs}
+              onClick={() => setShowTabs(!showTabs)}
+            >
+              <img src="/assets/archive.png" alt="" aria-hidden="true" />
+            </button>
+          </div>
+
+          {showTabs && <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />}
+
+          <ConversationList
+            {...historyListProps}
+            openConversation={openConversation}
+          />
+        </section>
+
+        <div className="sidebar-user" data-menu-root>
+          <button
+            type="button"
+            title="Compte"
+            aria-label="Compte"
+            onClick={() => {
+              closeTransientMenus()
+              setIsAccountMenuOpen((current) => !current)
+            }}
+          >
+            <span className="user-avatar-wrapper">
+              <span className="user-avatar">HA</span>
+            </span>
+            <span className="user-copy">
+              <strong>Hind Alami</strong>
+            </span>
+          </button>
+          {isSidebarOpen && isAccountMenuOpen && (
+            <AccountPopover
+              onShowArchived={() => {
+                setShowArchived(true)
+                setShowTabs(true)
+                setIsSidebarOpen(true)
+                setIsAccountMenuOpen(false)
+              }}
+            />
+          )}
+        </div>
+      </aside>
+
+      {!isSidebarOpen && isAccountMenuOpen && (
+        <AccountPopover
+          className="account-popover-collapsed"
+          onShowArchived={() => {
+            setShowArchived(true)
+            setShowTabs(true)
+            setIsSidebarOpen(true)
+            setIsAccountMenuOpen(false)
+          }}
+        />
+      )}
+
+      {!isSidebarOpen && collapsedPanel && (
+        <div className="collapsed-panel" data-menu-root>
+          <div className="collapsed-panel-header">
+            <strong>{collapsedPanel === 'history' ? 'Discussions recentes' : 'Rechercher'}</strong>
+          </div>
+
+          {(collapsedPanel === 'search' || collapsedPanel === 'history') && (
+            <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
+          )}
+          <ConversationList
+            {...historyListProps}
+            openConversation={async (conversation) => {
+              await openConversation(conversation)
+              setCollapsedPanel(null)
+            }}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+function AccountPopover({ className = 'account-popover-open', onShowArchived }) {
+  return (
+    <div className={`account-popover ${className}`} role="menu" data-menu-root>
+      <button type="button" role="menuitem" onClick={onShowArchived}>
+        Conversations archivees
+      </button>
+      <button type="button" role="menuitem">
+        Se deconnecter
+      </button>
+    </div>
+  )
+}
