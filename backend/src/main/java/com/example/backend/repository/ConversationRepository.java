@@ -1,7 +1,7 @@
 package com.example.backend.repository;
 
 import com.example.backend.entity.Conversation;
-import com.example.backend.entity.StatutConversation;
+import com.example.backend.enums.StatutConversation;
 import com.example.backend.entity.Utilisateur;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -28,7 +28,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
                   from Message msg
                   join msg.modele msgModel
                   where msg.conversation = c
-                    and msg.role = com.example.backend.entity.RoleMessage.ASSISTANT
+                    and msg.role = com.example.backend.enums.RoleMessage.ASSISTANT
                     and msgModel.aliasInterne = :modelAlias
                 )
               )
@@ -48,7 +48,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
                   from Message msg
                   join msg.modele msgModel
                   where msg.conversation = c
-                    and msg.role = com.example.backend.entity.RoleMessage.ASSISTANT
+                    and msg.role = com.example.backend.enums.RoleMessage.ASSISTANT
                     and msgModel.aliasInterne = :modelAlias
                 )
               )
@@ -80,3 +80,4 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             """)
     int deleteOwnedById(@Param("id") Long id, @Param("utilisateur") Utilisateur utilisateur);
 }
+

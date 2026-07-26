@@ -4,8 +4,9 @@ import com.example.backend.dto.ChatRequest;
 import com.example.backend.dto.ChatResponse;
 import com.example.backend.entity.FournisseurLlm;
 import com.example.backend.entity.ModeleLlm;
-import com.example.backend.entity.StatutFournisseurLlm;
-import com.example.backend.entity.StatutModeleLlm;
+import com.example.backend.enums.StatutFournisseurLlm;
+import com.example.backend.enums.StatutModeleLlm;
+import com.example.backend.integration.litellm.LiteLlmService;
 import com.example.backend.repository.ModeleLlmRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -72,3 +73,4 @@ class ChatServiceTest {
         verify(liteLlmService).chat("secure-gemini", "Bonjour");
     }
 }
+

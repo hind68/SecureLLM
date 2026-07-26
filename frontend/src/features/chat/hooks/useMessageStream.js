@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { streamConversationMessage } from '../api/conversationsApi'
-import { friendlyGenerationError } from '../utils/errors'
+import { streamConversationMessage } from '../../../api/conversationsApi'
+import { friendlyGenerationError } from '../../../utils/errors'
 import { extractSseData, parseJson } from '../utils/sse'
 
 /**

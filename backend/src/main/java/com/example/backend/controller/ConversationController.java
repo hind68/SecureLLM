@@ -1,20 +1,15 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.ChatRequest;
-import com.example.backend.dto.ChatResponse;
 import com.example.backend.dto.ChangeConversationModelRequest;
 import com.example.backend.dto.ConversationPageResponse;
 import com.example.backend.dto.ConversationResponse;
 import com.example.backend.dto.CreateConversationRequest;
 import com.example.backend.dto.MessageResponse;
-import com.example.backend.dto.ModelDto;
 import com.example.backend.dto.SendMessageRequest;
 import com.example.backend.dto.UpdateConversationRequest;
-import com.example.backend.service.ChatService;
 import com.example.backend.service.ConversationService;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,37 +24,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api")
-public class GatewayController {
+public class ConversationController {
 
-    private final ChatService chatService;
     private final ConversationService conversationService;
 
-    public GatewayController(ChatService chatService, ConversationService conversationService) {
-        this.chatService = chatService;
+    public ConversationController(ConversationService conversationService) {
         this.conversationService = conversationService;
-    }
-
-    @GetMapping("/health")
-    public Map<String, String> health() {
-        return Map.of(
-                "status", "OK",
-                "service", "secure-llm-backend"
-        );
-    }
-
-    @GetMapping("/models")
-    public List<String> models() {
-        return chatService.getAvailableModels();
-    }
-
-    @GetMapping("/models/details")
-    public List<ModelDto> modelDetails() {
-        return chatService.getAvailableModelDetails();
-    }
-
-    @PostMapping("/chat")
-    public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
-        return chatService.chat(request);
     }
 
     @PostMapping("/conversations")

@@ -1,5 +1,7 @@
 package com.example.backend.entity;
 
+import com.example.backend.enums.RoleMessage;
+import com.example.backend.enums.StatutMessage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -134,3 +136,5 @@ public class Message {
         return updatedAt;
     }
 }
+
+

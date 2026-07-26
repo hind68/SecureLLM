@@ -1,5 +1,6 @@
 package com.example.backend.entity;
 
+import com.example.backend.enums.StatutConversation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -124,3 +125,5 @@ public class Conversation {
         return dernierMessageAt;
     }
 }
+
+

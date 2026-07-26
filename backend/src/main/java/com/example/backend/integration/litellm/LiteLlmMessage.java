@@ -1,4 +1,4 @@
-package com.example.backend.service;
+package com.example.backend.integration.litellm;
 
 public record LiteLlmMessage(
         String role,

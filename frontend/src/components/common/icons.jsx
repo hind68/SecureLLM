@@ -17,6 +17,6 @@ export function StopIcon() {
 }
 
 export function CopyIcon({ tone = 'dark' }) {
-  const src = tone === 'light' ? '/assets/white_copy.png' : '/assets/copy.png'
+  const src = tone === 'light' ? '/assets/white-copy.png' : '/assets/copy.png'
   return <img className="copy-icon" src={src} alt="" aria-hidden="true" />
 }

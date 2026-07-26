@@ -10,10 +10,12 @@ import com.example.backend.dto.UpdateConversationRequest;
 import com.example.backend.entity.Conversation;
 import com.example.backend.entity.Message;
 import com.example.backend.entity.ModeleLlm;
-import com.example.backend.entity.RoleMessage;
-import com.example.backend.entity.StatutConversation;
-import com.example.backend.entity.StatutMessage;
-import com.example.backend.entity.StatutModeleLlm;
+import com.example.backend.enums.RoleMessage;
+import com.example.backend.enums.StatutConversation;
+import com.example.backend.enums.StatutMessage;
+import com.example.backend.enums.StatutModeleLlm;
+import com.example.backend.integration.litellm.LiteLlmMessage;
+import com.example.backend.integration.litellm.LiteLlmService;
 import com.example.backend.entity.Utilisateur;
 import com.example.backend.repository.ConversationRepository;
 import com.example.backend.repository.MessageRepository;
@@ -351,3 +353,4 @@ public class ConversationService {
     ) {
     }
 }
+

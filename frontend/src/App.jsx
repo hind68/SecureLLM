@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import useConversations from './features/conversations/hooks/useConversations'
 import AppLayout from './features/layout/AppLayout'
 import useAppMenus from './features/layout/hooks/useAppMenus'
+import useChatController from './features/chat/hooks/useChatController'
 import useChatUi from './features/chat/hooks/useChatUi'
 import useModels from './features/models/hooks/useModels'
 
@@ -9,10 +10,6 @@ function App() {
   const [chatError, setChatError] = useState('')
   const [chatNotice, setChatNotice] = useState('')
   const [showTabs, setShowTabs] = useState(false)
-
-  let currentChat = {}
-  let currentModel = {}
-  let currentDialogs = {}
 
   const showError = useCallback((message) => {
     setChatNotice('')
@@ -35,14 +32,19 @@ function App() {
 
   const menus = useAppMenus({
     onEscape: () => {
-      currentDialogs.setModelDecision?.(null)
       clearFeedback()
     },
   })
 
+  const models = useModels({
+    activeConversation: null,
+    onError: showError,
+    onLoaded: clearChatError,
+  })
+
   const conversations = useConversations({
-    getChatState: () => currentChat,
-    getModelState: () => currentModel,
+    selectedModel: models.selectedModel,
+    setSelectedModel: models.setSelectedModel,
     navigation: {
       closeSidePanelOnMobile: menus.closeSidePanelOnMobile,
       closeTransientMenus: menus.closeTransientMenus,
@@ -56,19 +58,6 @@ function App() {
     },
   })
 
-  currentDialogs = conversations.dialogs
-
-  const models = useModels({
-    activeConversation: conversations.state.activeConversation,
-    onError: showError,
-    onLoaded: clearChatError,
-  })
-
-  currentModel = {
-    selectedModel: models.selectedModel,
-    setSelectedModel: models.setSelectedModel,
-  }
-
   const chat = useChatUi({
     activeConversationIdRef: conversations.status.activeConversationIdRef,
     activeModelAlias: models.activeModelAlias,
@@ -79,13 +68,33 @@ function App() {
     showError,
   })
 
-  currentChat = chat
+  const controller = useChatController({
+    chat,
+    conversations,
+    models,
+    navigation: {
+      closeSidePanelOnMobile: menus.closeSidePanelOnMobile,
+      setIsModelMenuOpen: menus.setIsModelMenuOpen,
+    },
+    feedback: {
+      clearChatError,
+      showError,
+    },
+  })
 
   useEffect(() => {
     if (!chatError && !chatNotice) return undefined
     const timeout = window.setTimeout(clearFeedback, 5000)
     return () => window.clearTimeout(timeout)
   }, [chatError, chatNotice, clearFeedback])
+
+  const conversationProps = {
+    ...conversations,
+    actions: {
+      ...conversations.actions,
+      ...controller,
+    },
+  }
 
   return (
     <AppLayout
@@ -118,7 +127,7 @@ function App() {
       }}
       chat={chat}
       models={models}
-      conversations={conversations}
+      conversations={conversationProps}
       feedback={{
         chatError,
         chatNotice,

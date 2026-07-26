@@ -4,35 +4,23 @@ import {
   changeConversationModelRequest,
   createConversationRequest,
   deleteConversationRequest,
-  fetchConversationMessages,
   fetchConversations,
   renameConversationRequest,
   restoreConversationRequest,
 } from '../../../api/conversationsApi'
-import { friendlyGenerationError, logDevelopmentError, requestErrorMessage } from '../../../utils/errors'
+import { logDevelopmentError, requestErrorMessage } from '../../../utils/errors'
 import { displayConversationTitle, titleFrom } from '../../../utils/modelMetadata'
 import { clearActiveConversationId, saveActiveConversationId, saveLastModel } from '../../../utils/storage'
-import useActiveConversationRestore from './useActiveConversationRestore'
 import useConversationStatus from './useConversationStatus'
 
 /**
- * Owns conversation history, active conversation persistence, conversation CRUD,
- * model switching decisions and the UI-only status map used by the sidebar.
- *
- * @param {object} params
- * @param {Function} params.getChatState Chat UI getter. Conversation actions
- * read it at call time because chat state owns message cache, draft,
- * composer refs and SSE streaming, while this hook owns conversation creation.
- * @param {Function} params.getModelState Model getter containing the selected
- * model and its setter from `useModels`.
- * @param {object} params.navigation Sidebar/menu callbacks from `useAppMenus`.
- * @param {{ showError: Function, showNotice: Function, clearChatError: Function }} params.feedback Global feedback callbacks.
- * @returns {object} Grouped conversation state, editing state, dialogs, actions
- * and UI status helpers.
+ * Owns conversation state and server mutations that do not require chat UI
+ * state. Cross-domain workflows such as opening messages, first send and
+ * clearing cached messages are coordinated by `useChatController`.
  */
 export default function useConversations({
-  getChatState,
-  getModelState,
+  selectedModel,
+  setSelectedModel,
   navigation,
   feedback,
 }) {
@@ -96,110 +84,43 @@ export default function useConversations({
     activeConversationIdRef.current = activeConversation?.id || null
   }, [activeConversation?.id])
 
-  const openConversation = useCallback(async (conversation) => {
-    const chat = getChatState()
-    const model = getModelState()
-    try {
-      feedback.clearChatError()
-      navigation.closeTransientMenus()
-      setActiveConversation(conversation)
-      markConversationRead(conversation.id)
-      model.setSelectedModel(conversation.modelAlias)
-      saveLastModel(conversation.modelAlias)
-      saveActiveConversationId(conversation.id)
-      navigation.setActiveView('chat')
-      chat.setIsLastBlockVisible(true)
-      chat.shouldAutoScrollRef.current = true
-      // Messages are cached per conversation so switching threads does not
-      // refetch history unless the cache is cold.
-      const cachedMessages = chat.messageCacheRef.current.get(conversation.id)
-      if (cachedMessages) {
-        chat.setMessages(cachedMessages)
-        navigation.closeSidePanelOnMobile()
-        return
-      }
-      const nextMessages = await fetchConversationMessages(conversation.id)
-      chat.messageCacheRef.current.set(conversation.id, nextMessages)
-      chat.setMessages(nextMessages)
-      navigation.closeSidePanelOnMobile()
-    } catch {
-      feedback.showError('Impossible de reprendre cette conversation.')
-    }
-  }, [feedback, getChatState, getModelState, markConversationRead, navigation])
+  const openConversationRecord = useCallback((conversation) => {
+    feedback.clearChatError()
+    navigation.closeTransientMenus()
+    setActiveConversation(conversation)
+    markConversationRead(conversation.id)
+    setSelectedModel(conversation.modelAlias)
+    saveLastModel(conversation.modelAlias)
+    saveActiveConversationId(conversation.id)
+    navigation.setActiveView('chat')
+  }, [feedback, markConversationRead, navigation, setSelectedModel])
 
-  useActiveConversationRestore({
-    conversations,
-    hasLoadedHistory,
-    modelFilter,
-    openConversation,
-    restoreRef: activeConversationRestoreRef,
-    search,
-    showArchived,
-  })
-
-  const newConversation = useCallback((modelAlias = getModelState().selectedModel) => {
-    const chat = getChatState()
-    const model = getModelState()
+  const newConversationRecord = useCallback((modelAlias = selectedModel) => {
     setActiveConversation(null)
-    chat.setMessages([])
-    chat.setDraft('')
     feedback.clearChatError()
     clearActiveConversationId()
     navigation.closeTransientMenus()
-    model.setSelectedModel(modelAlias)
+    setSelectedModel(modelAlias)
     saveLastModel(modelAlias)
-    chat.setIsLastBlockVisible(true)
-    chat.shouldAutoScrollRef.current = true
     navigation.closeSidePanelOnMobile()
-  }, [feedback, getChatState, getModelState, navigation])
+  }, [feedback, navigation, selectedModel, setSelectedModel])
 
   const createConversation = useCallback(async (modelAlias, title) => {
-    const model = getModelState()
     const conversation = { ...(await createConversationRequest(modelAlias, title)), uiStatus: 'idle' }
     setActiveConversation(conversation)
     markConversationRead(conversation.id)
-    model.setSelectedModel(conversation.modelAlias)
+    setSelectedModel(conversation.modelAlias)
     saveLastModel(conversation.modelAlias)
     saveActiveConversationId(conversation.id)
     setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)])
     return conversation
-  }, [getModelState, markConversationRead])
+  }, [markConversationRead, setSelectedModel])
 
   const ensureConversation = useCallback(async (prompt) => {
     if (activeConversation) return activeConversation
-    // A conversation is created only on first send, which keeps an empty draft
-    // from creating server history.
-    return createConversation(getModelState().selectedModel, titleFrom(prompt))
-  }, [activeConversation, createConversation, getModelState])
-
-  const sendMessage = useCallback(async (event) => {
-    event.preventDefault()
-    const chat = getChatState()
-    if (isGenerating) {
-      chat.stopGeneration()
-      return
-    }
-    const prompt = chat.draft.trim()
-    if (!prompt) {
-      feedback.showError('Le message ne peut pas etre vide.')
-      return
-    }
-
-    feedback.clearChatError()
-    if (!chat.hasActiveMessages && chat.composerRef.current) {
-      chat.composerBeforeRectRef.current = chat.composerRef.current.getBoundingClientRect()
-    }
-    chat.setDraft('')
-    chat.setIsLastBlockVisible(true)
-    chat.shouldAutoScrollRef.current = true
-
-    try {
-      const conversation = await ensureConversation(prompt)
-      void chat.streamMessage(conversation, prompt)
-    } catch (error) {
-      feedback.showError(friendlyGenerationError(error))
-    }
-  }, [ensureConversation, feedback, getChatState, isGenerating])
+    // A conversation is created only on first send, keeping empty drafts out of history.
+    return createConversation(selectedModel, titleFrom(prompt))
+  }, [activeConversation, createConversation, selectedModel])
 
   const renameConversation = useCallback((conversation = activeConversation) => {
     if (!conversation || isGenerating) return
@@ -229,33 +150,33 @@ export default function useConversations({
     }
   }, [closeMenus, editingTitle, feedback, isGenerating])
 
-  const archiveConversation = useCallback(async (conversation = activeConversation) => {
-    const chat = getChatState()
-    if (!conversation || isGenerating) return
+  const archiveConversationRecord = useCallback(async (conversation = activeConversation) => {
+    if (!conversation || isGenerating) return { wasActive: false }
     try {
       await archiveConversationRequest(conversation.id)
       setConversations((current) => current.filter((item) => item.id !== conversation.id))
-      if (activeConversation?.id === conversation.id) {
+      const wasActive = activeConversation?.id === conversation.id
+      if (wasActive) {
         setActiveConversation(null)
-        chat.setMessages([])
       }
       clearActiveConversationId(conversation.id)
       closeMenus()
       await loadConversations()
+      return { wasActive }
     } catch {
       feedback.showError('Impossible d archiver la conversation.')
+      return { wasActive: false }
     }
-  }, [activeConversation, closeMenus, feedback, getChatState, isGenerating, loadConversations])
+  }, [activeConversation, closeMenus, feedback, isGenerating, loadConversations])
 
   const restoreConversation = useCallback(async (conversation) => {
-    const model = getModelState()
     if (!conversation || isGenerating) return
     try {
       const updated = await restoreConversationRequest(conversation.id)
       setConversations((current) => current.filter((item) => item.id !== updated.id))
       if (activeConversation?.id === updated.id) {
         setActiveConversation(updated)
-        model.setSelectedModel(updated.modelAlias)
+        setSelectedModel(updated.modelAlias)
         saveLastModel(updated.modelAlias)
         saveActiveConversationId(updated.id)
       }
@@ -265,9 +186,9 @@ export default function useConversations({
     } catch (error) {
       feedback.showError(requestErrorMessage(error, 'Impossible de desarchiver la conversation.'))
     }
-  }, [activeConversation, closeMenus, feedback, getModelState, isGenerating, loadConversations])
+  }, [activeConversation, closeMenus, feedback, isGenerating, loadConversations, setSelectedModel])
 
-  const deleteConversation = useCallback(async (conversation = activeConversation) => {
+  const requestDeleteConversation = useCallback(async (conversation = activeConversation) => {
     if (!conversation || isGenerating) return
     if (!conversation.id) {
       feedback.showError('Impossible de supprimer cette conversation: identifiant manquant.')
@@ -278,69 +199,48 @@ export default function useConversations({
     closeMenus()
   }, [activeConversation, closeMenus, feedback, isGenerating])
 
-  const confirmDeleteConversation = useCallback(async () => {
-    const chat = getChatState()
+  const confirmDeleteConversationRecord = useCallback(async () => {
     const conversation = pendingDeleteConversation
-    if (!conversation || isGenerating) return
+    if (!conversation || isGenerating) return { wasActive: false }
     try {
       await deleteConversationRequest(conversation.id)
       setConversations((current) => current.filter((item) => item.id !== conversation.id))
-      if (activeConversation?.id === conversation.id) {
+      const wasActive = activeConversation?.id === conversation.id
+      if (wasActive) {
         setActiveConversation(null)
-        chat.setMessages([])
       }
       clearActiveConversationId(conversation.id)
       closeMenus()
       setPendingDeleteConversation(null)
       feedback.showNotice('Conversation supprimee.')
       await loadConversations()
+      return { wasActive }
     } catch (error) {
       feedback.showError(requestErrorMessage(error, 'Impossible de supprimer la conversation.'))
+      return { wasActive: false }
     }
-  }, [activeConversation, closeMenus, feedback, getChatState, isGenerating, loadConversations, pendingDeleteConversation])
+  }, [activeConversation, closeMenus, feedback, isGenerating, loadConversations, pendingDeleteConversation])
 
-  const selectModel = useCallback(async (alias) => {
-    const chat = getChatState()
-    const model = getModelState()
-    navigation.setIsModelMenuOpen(false)
-    if (isGenerating) return
-    if (!activeConversation) {
-      model.setSelectedModel(alias)
-      saveLastModel(alias)
-      return
-    }
-    if (activeConversation.modelAlias === alias) return
-    if (chat.messages.length === 0) {
-      model.setSelectedModel(alias)
-      saveLastModel(alias)
-      setActiveConversation((current) => (current ? { ...current, modelAlias: alias } : current))
-      return
-    }
-    // Existing messages make model switching ambiguous, so the existing dialog
-    // asks whether to continue this thread or start a new one.
-    setModelDecision({ alias })
-  }, [activeConversation, getChatState, getModelState, isGenerating, navigation])
-
-  const continueWithModel = useCallback(async (alias) => {
-    const model = getModelState()
-    if (!activeConversation) return
+  const changeConversationModel = useCallback(async (alias) => {
+    if (!activeConversation) return null
     try {
       const updated = await changeConversationModelRequest(activeConversation.id, alias)
       setActiveConversation(updated)
-      model.setSelectedModel(updated.modelAlias)
+      setSelectedModel(updated.modelAlias)
       saveLastModel(updated.modelAlias)
       saveActiveConversationId(updated.id)
       setConversations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setModelDecision(null)
+      return updated
     } catch (error) {
       feedback.showError(requestErrorMessage(error, 'Impossible de changer le modele.'))
+      return null
     }
-  }, [activeConversation, feedback, getModelState])
+  }, [activeConversation, feedback, setSelectedModel])
 
-  const openNewConversationWithModel = useCallback(async (alias) => {
-    newConversation(alias)
-    setModelDecision(null)
-  }, [newConversation])
+  const setActiveConversationModelAlias = useCallback((alias) => {
+    setActiveConversation((current) => (current ? { ...current, modelAlias: alias } : current))
+  }, [])
 
   return {
     state: {
@@ -371,23 +271,23 @@ export default function useConversations({
       setPendingDeleteConversation,
     },
     actions: {
-      archiveConversation,
-      confirmDeleteConversation,
-      continueWithModel,
-      deleteConversation,
+      archiveConversationRecord,
+      changeConversationModel,
+      confirmDeleteConversationRecord,
+      createConversation,
       ensureConversation,
       loadConversations,
-      newConversation,
-      openConversation,
-      openNewConversationWithModel,
+      newConversationRecord,
+      openConversationRecord,
       renameConversation,
+      requestDeleteConversation,
       restoreConversation,
       saveInlineRename,
-      selectModel,
-      sendMessage,
+      setActiveConversationModelAlias,
     },
     status: {
       activeConversationIdRef,
+      activeConversationRestoreRef,
       conversationUiStatus,
       generatingConversationId,
       isGenerating,

@@ -1,5 +1,19 @@
 # Secure LLM Gateway
 
+## Architecture actuelle
+
+- `frontend/src/features/` regroupe les domaines React: `chat`, `conversations`, `layout` et `models`.
+- `frontend/src/features/chat/hooks/useChatController.js` coordonne uniquement les workflows qui traversent chat + conversations, par exemple premier envoi, ouverture d'une conversation et chargement du cache messages.
+- `backend/src/main/java/com/example/backend/controller/` est separe par domaine: health, chat, models et conversations. Les URLs restent sous `/api`.
+- `backend/src/main/java/com/example/backend/integration/litellm/` contient l'integration LiteLLM basee sur `WebClient`.
+- `backend/src/main/java/com/example/backend/enums/` contient les enums JPA. Les valeurs stockees en base ne changent pas.
+
+## Notes d'exploitation
+
+- Le backend conserve MVC pour les controleurs HTTP/SSE et WebFlux pour `WebClient`, utilise par l'integration LiteLLM.
+- L'image LiteLLM utilise encore le tag `latest`; il faudra figer une version apres validation d'une release precise.
+- `--detailed_debug` et `set_verbose: true` sont pratiques en local, mais doivent etre desactives en environnement sensible ou production afin d'eviter des logs trop bavards.
+
 Secure LLM Gateway is a local proof of concept for routing chat requests through a controlled backend before calling LLM providers through LiteLLM.
 
 The current project contains:

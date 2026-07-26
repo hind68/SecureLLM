@@ -1,5 +1,6 @@
 package com.example.backend.entity;
 
+import com.example.backend.enums.StatutFournisseurLlm;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -64,3 +65,5 @@ public class FournisseurLlm {
         return modeles;
     }
 }
+
+

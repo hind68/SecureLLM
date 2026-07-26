@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import useAutoScroll from '../../../hooks/useAutoScroll'
-import useMessageStream from '../../../hooks/useMessageStream'
+import useAutoScroll from './useAutoScroll'
+import useMessageStream from './useMessageStream'
 import { logDevelopmentError } from '../../../utils/errors'
 
 /**

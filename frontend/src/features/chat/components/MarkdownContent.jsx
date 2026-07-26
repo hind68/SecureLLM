@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
-import { normalizeAssistantMarkdown, normalizeMarkdownCodeFences } from '../../../utils/markdown'
+import { normalizeAssistantMarkdown, normalizeMarkdownCodeFences } from '../utils/markdown'
 import CodeBlock from './CodeBlock'
 
 export default function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }) {

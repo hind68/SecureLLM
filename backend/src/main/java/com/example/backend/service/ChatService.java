@@ -4,7 +4,8 @@ import com.example.backend.dto.ChatRequest;
 import com.example.backend.dto.ChatResponse;
 import com.example.backend.dto.ModelDto;
 import com.example.backend.entity.ModeleLlm;
-import com.example.backend.entity.StatutModeleLlm;
+import com.example.backend.enums.StatutModeleLlm;
+import com.example.backend.integration.litellm.LiteLlmService;
 import com.example.backend.repository.ModeleLlmRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -46,3 +47,4 @@ public class ChatService {
         return new ChatResponse(request.model(), answer);
     }
 }
+

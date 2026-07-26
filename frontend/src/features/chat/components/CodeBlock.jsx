@@ -1,7 +1,7 @@
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { CopyIcon } from '../../../components/common/icons'
-import { detectCodeLanguage, formatLanguageName, hashText } from '../../../utils/markdown'
-import SyntaxHighlighter from './syntaxHighlighter'
+import { detectCodeLanguage, formatLanguageName, hashText } from '../utils/markdown'
+import SyntaxHighlighter from '../config/syntaxHighlighter'
 
 export default function CodeBlock({ code, copiedKey, language, onCopy, setCopiedKey }) {
   const detectedLanguage = detectCodeLanguage(code, language)

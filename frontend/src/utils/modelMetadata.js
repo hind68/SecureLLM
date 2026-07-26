@@ -80,10 +80,10 @@ export function modelCardMeta(alias) {
 
 export function modelLogoSrc(alias) {
   const logos = {
-    'secure-gpt': '/assets/ChatGPT Logo.png',
-    'secure-groq': '/assets/groq logo.png',
-    'secure-gemini': '/assets/gemini logo.png',
-    'secure-mistral': '/assets/mistral logo.png',
+    'secure-gpt': '/assets/chatgpt-logo.png',
+    'secure-groq': '/assets/groq-logo.png',
+    'secure-gemini': '/assets/gemini-provider-logo.png',
+    'secure-mistral': '/assets/mistral-provider-logo.png',
     'secure-claude': '/assets/claude logo.png',
   }
   return logos[alias] || ''

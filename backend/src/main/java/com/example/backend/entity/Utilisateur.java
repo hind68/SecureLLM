@@ -51,3 +51,4 @@ public class Utilisateur {
         return updatedAt;
     }
 }
+
