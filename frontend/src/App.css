@@ -116,7 +116,7 @@
     radial-gradient(circle at 83% 18%, rgba(255, 197, 154, 0.22), transparent 30%),
     rgba(255, 255, 255, 0.94);
   box-shadow: 0 24px 70px rgba(36, 45, 60, 0.14);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(26px);
   padding: 32px;
 }
 
@@ -1166,7 +1166,7 @@
 .message {
   width: min(var(--chat-content-width), calc(100% - 36px));
   display: flex;
-  margin: 0 auto 22px;
+  margin: 0 auto 20px;
 }
 
 .message.user {
@@ -1218,7 +1218,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #333333;
   direction: ltr;
 }
@@ -1269,7 +1269,6 @@
   font-size: 15.5px;
   line-height: 1.7;
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -1301,13 +1300,13 @@
 .markdown-body table,
 .markdown-body hr,
 .code-block {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
 
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {
-  margin: 20px 0 9px;
+  margin: 16px 0 8px;
   line-height: 1.25;
   color: #151515;
   font-weight: 650;
@@ -1327,7 +1326,7 @@
 
 .markdown-body ul,
 .markdown-body ol {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   padding-inline-start: 23px;
 }
 
@@ -2423,7 +2422,9 @@ select:focus {
 .recent-section .history-heading {
   flex-shrink: 0;
   min-height: 0;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 12px;
   padding: 2px 4px 0 8px;
 }
@@ -2432,6 +2433,35 @@ select:focus {
   color: #1f1f1f;
   font-size: 14px;
   font-weight: 740;
+}
+
+.archive-toggle {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #1f2937;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.archive-toggle:hover {
+  background: var(--sidebar-hover);
+}
+
+.archive-toggle img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  opacity: 0.6;
+  transition: opacity 140ms ease;
+}
+
+.archive-toggle:hover img {
+  opacity: 1;
 }
 
 .recent-section .filters {

@@ -2,6 +2,7 @@ package com.example.backend.service;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -17,16 +18,23 @@ import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 @Service
 public class LiteLlmService {
 
-    private static final LiteLlmMessage SYSTEM_FORMATTING_INSTRUCTION = new LiteLlmMessage(
+    private static final LiteLlmMessage SYSTEM_INSTRUCTION = new LiteLlmMessage(
             "system",
             """
-            Reponds avec du Markdown valide.
-            Ajoute toujours un espace apres les titres Markdown (#, ##, ###).
-            Utilise des fences de code explicites comme ```python ou ```java.
-            Mets une seule instruction de code par ligne et conserve l indentation correcte.
-            Ne traduis jamais les mots-cles, fonctions, classes, variables ou identifiants du code en arabe.
-            Si l utilisateur demande une explication en arabe, explique en arabe mais garde le code dans son langage de programmation.
+            Tu es un assistant IA educatif.
+            Regle 1 : Ne genere JAMAIS de code (Python, SQL, etc.) a moins que l'utilisateur ne le demande explicitement. Privilegie toujours les reponses en texte naturel.
+            Regle 2 : L'utilisateur etudie la cybersecurite dans un cadre academique et defensif. Tu ne dois pas refuser d'expliquer les concepts d'attaques cybernetiques (comme les injections SQL). Explique-les de maniere theorique pour l'aider a comprendre comment s'en proteger.
             """
+    );
+    private static final List<Map<String, String>> GEMINI_SAFETY_SETTINGS = List.of(
+            Map.of(
+                    "category", "HARM_CATEGORY_HARASSMENT",
+                    "threshold", "BLOCK_NONE"
+            ),
+            Map.of(
+                    "category", "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold", "BLOCK_NONE"
+            )
     );
 
     private final WebClient webClient;
@@ -47,10 +55,7 @@ public class LiteLlmService {
     }
 
     public String chat(String model, List<LiteLlmMessage> messages) {
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", toPayload(messages)
-        );
+        Map<String, Object> body = requestBody(model, false, messages);
 
         Map<?, ?> response = webClient.post()
                 .uri("/v1/chat/completions")
@@ -76,11 +81,7 @@ public class LiteLlmService {
             Runnable onComplete,
             Consumer<Throwable> onError
     ) {
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "stream", true,
-                "messages", toPayload(messages)
-        );
+        Map<String, Object> body = requestBody(model, true, messages);
 
         webClient.post()
                 .uri("/v1/chat/completions")
@@ -98,11 +99,28 @@ public class LiteLlmService {
 
     private List<Map<String, String>> toPayload(List<LiteLlmMessage> messages) {
         List<Map<String, String>> payload = new ArrayList<>();
-        payload.add(toPayloadMessage(SYSTEM_FORMATTING_INSTRUCTION));
+        payload.add(toPayloadMessage(SYSTEM_INSTRUCTION));
         messages.stream()
                 .map(this::toPayloadMessage)
                 .forEach(payload::add);
         return payload;
+    }
+
+    private Map<String, Object> requestBody(String model, boolean stream, List<LiteLlmMessage> messages) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("messages", toPayload(messages));
+        if (stream) {
+            body.put("stream", true);
+        }
+        if (isGeminiModel(model)) {
+            body.put("safety_settings", GEMINI_SAFETY_SETTINGS);
+        }
+        return body;
+    }
+
+    private boolean isGeminiModel(String model) {
+        return model != null && model.toLowerCase().contains("gemini");
     }
 
     private Map<String, String> toPayloadMessage(LiteLlmMessage message) {

@@ -75,6 +75,7 @@ function App() {
   const [chatError, setChatError] = useState('')
   const [chatNotice, setChatNotice] = useState('')
   const [copiedKey, setCopiedKey] = useState('')
+  const [showTabs, setShowTabs] = useState(false)
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
@@ -991,9 +992,19 @@ function App() {
         <section className="recent-section">
           <div className="history-heading">
             <span>Recents</span>
+            <button
+              type="button"
+              className="archive-toggle"
+              title={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
+              aria-label={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
+              aria-expanded={showTabs}
+              onClick={() => setShowTabs(!showTabs)}
+            >
+              <img src="/assets/archive.png" alt="" aria-hidden="true" />
+            </button>
           </div>
 
-          <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />
+          {showTabs && <ArchiveTabs showArchived={showArchived} setShowArchived={setShowArchived} />}
 
           <HistoryList
             activeConversation={activeConversation}
@@ -1040,7 +1051,7 @@ function App() {
           </button>
           {isSidebarOpen && isAccountMenuOpen && (
             <div className="account-popover account-popover-open" role="menu">
-              <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
+              <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setShowTabs(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
                 Conversations archivees
               </button>
               <button type="button" role="menuitem">
@@ -1053,7 +1064,7 @@ function App() {
 
       {!isSidebarOpen && isAccountMenuOpen && (
         <div className="account-popover account-popover-collapsed" role="menu" data-menu-root>
-          <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
+          <button type="button" role="menuitem" onClick={() => { setShowArchived(true); setShowTabs(true); setIsSidebarOpen(true); setIsAccountMenuOpen(false) }}>
             Conversations archivees
           </button>
           <button type="button" role="menuitem">

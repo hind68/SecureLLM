@@ -75,7 +75,7 @@ Aliases actifs:
 
 - `secure-gpt` -> OpenAI `gpt-4o-mini`
 - `secure-groq` -> Groq `llama-3.1-8b-instant`
-- `secure-gemini` -> Gemini `gemini-2.5-flash`
+- `secure-gemini` -> Gemini `gemini-3.6-flash`
 - `secure-mistral` -> Mistral `mistral-small-latest`
 
 Alias prepare mais commente:

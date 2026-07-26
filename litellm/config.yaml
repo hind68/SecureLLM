@@ -11,7 +11,7 @@ model_list:
 
   - model_name: secure-gemini
     litellm_params:
-      model: gemini/gemini-2.5-flash
+      model: gemini/gemini-3.6-flash
       api_key: os.environ/GEMINI_API_KEY
 
   # Optional provider: uncomment this block only when ANTHROPIC_API_KEY is available in .env.

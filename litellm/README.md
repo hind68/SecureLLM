@@ -16,7 +16,7 @@ Current aliases in `config.yaml`:
 | --- | --- | --- |
 | `secure-gpt` | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
 | `secure-groq` | `groq/llama-3.1-8b-instant` | `GROQ_API_KEY` |
-| `secure-gemini` | `gemini/gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `secure-gemini` | `gemini/gemini-3.6-flash` | `GEMINI_API_KEY` |
 | `secure-mistral` | `mistral/mistral-small-latest` | `MISTRAL_API_KEY` |
 
 `secure-claude` is present as a commented optional block. Uncomment it only when `ANTHROPIC_API_KEY` is available.

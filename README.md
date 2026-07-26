@@ -53,7 +53,7 @@ Provider keys used by the current LiteLLM config:
 | --- | --- | --- | --- |
 | `secure-gpt` | OpenAI GPT-4o mini | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
 | `secure-groq` | Groq Llama 3.1 8B | `groq/llama-3.1-8b-instant` | `GROQ_API_KEY` |
-| `secure-gemini` | Gemini 2.5 Flash | `gemini/gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `secure-gemini` | Gemini 3.6 Flash | `gemini/gemini-3.6-flash` | `GEMINI_API_KEY` |
 | `secure-mistral` | Mistral Small | `mistral/mistral-small-latest` | `MISTRAL_API_KEY` |
 
 `secure-claude` is prepared in `litellm/config.yaml` but is commented. Enable it only after adding `ANTHROPIC_API_KEY`.

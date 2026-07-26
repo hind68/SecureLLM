@@ -70,7 +70,7 @@ class ConversationServiceTest {
         FournisseurLlm fournisseur = new FournisseurLlm("groq", "Groq", StatutFournisseurLlm.ACTIF);
         FournisseurLlm gemini = new FournisseurLlm("gemini", "Google Gemini", StatutFournisseurLlm.ACTIF);
         model = new ModeleLlm(fournisseur, "secure-groq", "groq/llama-3.1-8b-instant", "Groq", StatutModeleLlm.ACTIF);
-        geminiModel = new ModeleLlm(gemini, "secure-gemini", "gemini/gemini-2.5-flash", "Gemini", StatutModeleLlm.ACTIF);
+        geminiModel = new ModeleLlm(gemini, "secure-gemini", "gemini/gemini-3.6-flash", "Gemini", StatutModeleLlm.ACTIF);
         conversation = new Conversation(demoUser, model, "Bonjour");
         service = new ConversationService(
                 conversationRepository,
