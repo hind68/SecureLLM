@@ -87,16 +87,17 @@
 
 .model-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, 260px);
+  grid-template-columns: repeat(4, minmax(0, 200px));
   justify-content: center;
-  gap: 28px;
+  gap: 20px;
 }
 
 .model-card {
   position: relative;
-  width: 260px;
-  min-width: 230px;
-  min-height: 220px;
+  width: 200px;
+  max-width: 200px;
+  min-width: 0;
+  min-height: 182px;
   border: 1px solid #f3f4f6;
   border-radius: 22px;
   background:
@@ -115,7 +116,7 @@
   justify-content: center;
   font: inherit;
   overflow: hidden;
-  padding: 32px 24px;
+  padding: 18px;
   text-align: center;
   transition: all 0.2s ease-in-out;
 }
@@ -144,7 +145,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  height: 96px;
+  height: 66px;
   flex-shrink: 0;
   border-radius: 0;
   background: transparent;
@@ -153,29 +154,29 @@
 }
 
 .model-card-logo {
-  width: min(170px, 92%);
-  height: 84px;
+  width: min(132px, 92%);
+  height: 66px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
 }
 
 .model-card-logo img {
-  width: min(170px, 92%);
-  max-height: 84px;
+  width: min(132px, 92%);
+  max-height: 66px;
   object-fit: contain;
   display: block;
 }
 
 .model-card-logo:not(:has(img)) {
-  width: 62px;
-  height: 62px;
-  border-radius: 15px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.58);
   color: #222222;
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 720;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
@@ -235,9 +236,9 @@
 }
 
 .model-card h3 {
-  margin: 16px 0 0;
+  margin: 12px 0 0;
   color: #111827;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -245,7 +246,7 @@
 .model-card p {
   margin: 0;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.4;
   max-width: 100%;
   overflow: hidden;

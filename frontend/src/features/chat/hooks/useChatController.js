@@ -59,7 +59,6 @@ export default function useChatController({
   const sendMessage = useCallback(async (event) => {
     event.preventDefault()
     if (status.isGenerating) {
-      chat.stopGeneration()
       return
     }
     const prompt = chat.draft.trim()

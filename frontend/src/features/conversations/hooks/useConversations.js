@@ -87,6 +87,7 @@ export default function useConversations({
   const openConversationRecord = useCallback((conversation) => {
     feedback.clearChatError()
     navigation.closeTransientMenus()
+    activeConversationIdRef.current = conversation.id
     setActiveConversation(conversation)
     markConversationRead(conversation.id)
     setSelectedModel(conversation.modelAlias)
@@ -96,6 +97,7 @@ export default function useConversations({
   }, [feedback, markConversationRead, navigation, setSelectedModel])
 
   const newConversationRecord = useCallback((modelAlias = selectedModel) => {
+    activeConversationIdRef.current = null
     setActiveConversation(null)
     feedback.clearChatError()
     clearActiveConversationId()
@@ -107,6 +109,7 @@ export default function useConversations({
 
   const createConversation = useCallback(async (modelAlias, title) => {
     const conversation = { ...(await createConversationRequest(modelAlias, title)), uiStatus: 'idle' }
+    activeConversationIdRef.current = conversation.id
     setActiveConversation(conversation)
     markConversationRead(conversation.id)
     setSelectedModel(conversation.modelAlias)
@@ -157,6 +160,7 @@ export default function useConversations({
       setConversations((current) => current.filter((item) => item.id !== conversation.id))
       const wasActive = activeConversation?.id === conversation.id
       if (wasActive) {
+        activeConversationIdRef.current = null
         setActiveConversation(null)
       }
       clearActiveConversationId(conversation.id)
@@ -207,6 +211,7 @@ export default function useConversations({
       setConversations((current) => current.filter((item) => item.id !== conversation.id))
       const wasActive = activeConversation?.id === conversation.id
       if (wasActive) {
+        activeConversationIdRef.current = null
         setActiveConversation(null)
       }
       clearActiveConversationId(conversation.id)
@@ -225,6 +230,7 @@ export default function useConversations({
     if (!activeConversation) return null
     try {
       const updated = await changeConversationModelRequest(activeConversation.id, alias)
+      activeConversationIdRef.current = updated.id
       setActiveConversation(updated)
       setSelectedModel(updated.modelAlias)
       saveLastModel(updated.modelAlias)

@@ -32,6 +32,7 @@ export default function ChatComposer({
         className={isGenerating ? 'stop-button' : ''}
         type={isGenerating ? 'button' : 'submit'}
         aria-label={isGenerating ? 'Interrompre la generation' : 'Envoyer'}
+        title={isGenerating ? 'Interrompre la generation' : 'Envoyer'}
         disabled={!isGenerating && !canSend}
         onClick={isGenerating ? onStop : undefined}
       >

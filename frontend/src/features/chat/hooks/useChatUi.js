@@ -108,9 +108,10 @@ export default function useChatUi({
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
+      if (isGenerating) return
       event.currentTarget.form?.requestSubmit()
     }
-  }, [])
+  }, [isGenerating])
 
   const onCopy = useCallback(async (text) => {
     if (!text) return false

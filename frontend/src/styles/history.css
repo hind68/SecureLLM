@@ -148,24 +148,25 @@
   width: 100%;
   min-width: 0;
   border: none;
-  border-radius: 2px;
+  border-radius: 4px;
   background: transparent;
   box-shadow: none;
   color: inherit;
   font: inherit;
   font-family: inherit;
   font-size: inherit;
+  font-weight: inherit;
   line-height: 1.5;
   margin: 0;
   outline: none !important;
-  padding: 0;
+  padding: 2px 4px;
 }
 
 .history-title-input:focus,
 .history-title-input:focus-visible {
-  background-color: #f3f4f6;
+  background-color: rgba(0, 0, 0, 0.05);
   border: none !important;
-  border-bottom: 1px dashed #9ca3af !important;
+  border-bottom: none !important;
   box-shadow: none !important;
   outline: none !important;
 }

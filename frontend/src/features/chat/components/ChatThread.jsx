@@ -9,6 +9,7 @@ export default function ChatThread({
   goToBottom,
   hasActiveMessages,
   isComposerTransitioning,
+  isGenerating,
   isLastBlockVisible,
   messages,
   messagesRef,
@@ -46,8 +47,21 @@ export default function ChatThread({
       </section>
 
       {!isLastBlockVisible && hasActiveMessages && (
-        <button className="go-bottom-button" type="button" onClick={goToBottom}>
-          <DownArrowIcon />
+        <button
+          className={`go-bottom-button ${isGenerating ? 'is-generating' : ''}`}
+          type="button"
+          aria-label="Defiler vers le bas"
+          onClick={goToBottom}
+        >
+          {isGenerating ? (
+            <span className="go-bottom-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          ) : (
+            <DownArrowIcon />
+          )}
         </button>
       )}
     </>

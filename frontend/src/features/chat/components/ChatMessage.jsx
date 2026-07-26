@@ -1,10 +1,11 @@
+import { memo } from 'react'
 import { CopyIcon } from '../../../components/common/icons'
 import ModelLogo from '../../models/components/ModelLogo'
 import MarkdownContent from './MarkdownContent'
 import { cleanModelName, modelCardMeta } from '../../../utils/modelMetadata'
 import { detectTextDirection } from '../utils/markdown'
 
-export default function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
+function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
   const isUser = message.role === 'USER'
   const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, message.modelAlias)
   const isWaiting = !isUser && message.status === 'EN_COURS' && !message.content
@@ -97,3 +98,28 @@ function markCopied(copyKey, setCopiedKey) {
   setCopiedKey(copyKey)
   window.setTimeout(() => setCopiedKey((current) => (current === copyKey ? '' : current)), 1500)
 }
+
+function isCopyStateRelevant(copiedKey, messageId) {
+  return copiedKey === `message-${messageId}` || copiedKey === `prompt-${messageId}`
+}
+
+function areChatMessagesEqual(previous, next) {
+  const previousMessage = previous.message
+  const nextMessage = next.message
+  const sameStableProps = (
+    previousMessage === nextMessage &&
+    previous.fallbackModelName === next.fallbackModelName &&
+    previous.onCopy === next.onCopy &&
+    previous.setCopiedKey === next.setCopiedKey
+  )
+
+  if (!sameStableProps) return false
+  if (previous.copiedKey === next.copiedKey) return true
+
+  const wasCopyRelevant = isCopyStateRelevant(previous.copiedKey, previousMessage.id)
+  const isCopyRelevant = isCopyStateRelevant(next.copiedKey, nextMessage.id)
+
+  return !wasCopyRelevant && !isCopyRelevant
+}
+
+export default memo(ChatMessage, areChatMessagesEqual)

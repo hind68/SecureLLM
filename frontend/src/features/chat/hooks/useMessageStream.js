@@ -6,9 +6,9 @@ import { extractSseData, parseJson } from '../utils/sse'
 /**
  * Owns the streaming lifecycle for assistant generations.
  *
- * The hook keeps mutable refs for AbortController, token queues and the message cache because
- * SSE callbacks can outlive a render. Refs let each chunk update the latest cache without
- * closing over stale React state.
+ * The hook keeps mutable refs for AbortController and the message cache because
+ * SSE callbacks can outlive a render. Tokens are applied as soon as their SSE
+ * event arrives so the UI keeps a continuous typewriter feel.
  */
 export default function useMessageStream({
   activeConversationIdRef,
@@ -21,9 +21,6 @@ export default function useMessageStream({
   const generationAbortRef = useRef(null)
   const messageCacheRef = useRef(new Map())
   const localIdCounterRef = useRef(0)
-  const tokenQueuesRef = useRef(new Map())
-  const tokenTimersRef = useRef(new Map())
-  const flushQueuedTokensRef = useRef(null)
 
   const updateConversationMessages = useCallback((conversationId, updater) => {
     const currentMessages = messageCacheRef.current.get(conversationId) || []
@@ -34,52 +31,18 @@ export default function useMessageStream({
     }
   }, [activeConversationIdRef, setMessages])
 
-  const flushQueuedTokens = useCallback((assistantId, conversationId) => {
-    const timer = tokenTimersRef.current.get(assistantId)
-    if (timer) {
-      window.clearTimeout(timer)
-      tokenTimersRef.current.delete(assistantId)
-    }
-    const queued = tokenQueuesRef.current.get(assistantId) || ''
-    if (!queued) return
-
-    // Tokens are buffered into tiny chunks so the UI streams smoothly without rendering every byte.
-    const chunk = queued.slice(0, 8)
-    const rest = queued.slice(8)
-    tokenQueuesRef.current.set(assistantId, rest)
+  const appendToken = useCallback((conversationId, assistantId, token) => {
+    if (!token) return
     updateConversationMessages(conversationId, (current) =>
       current.map((item) =>
-        item.id === assistantId ? { ...item, content: `${item.content}${chunk}` } : item,
+        item.id === assistantId ? { ...item, content: `${item.content}${token}` } : item,
       ),
     )
-    if (rest) {
-      tokenTimersRef.current.set(
-        assistantId,
-        window.setTimeout(() => flushQueuedTokensRef.current?.(assistantId, conversationId), 18),
-      )
-    } else {
-      tokenQueuesRef.current.delete(assistantId)
-    }
   }, [updateConversationMessages])
-  useEffect(() => {
-    flushQueuedTokensRef.current = flushQueuedTokens
-  }, [flushQueuedTokens])
 
-  const enqueueToken = useCallback((conversationId, assistantId, token) => {
-    if (!token) return
-    tokenQueuesRef.current.set(assistantId, `${tokenQueuesRef.current.get(assistantId) || ''}${token}`)
-    if (!tokenTimersRef.current.has(assistantId)) {
-      tokenTimersRef.current.set(
-        assistantId,
-        window.setTimeout(() => flushQueuedTokens(assistantId, conversationId), 18),
-      )
-    }
-  }, [flushQueuedTokens])
-
-  const notifyConversationReady = useCallback((conversationId) => {
-    const nextStatus = String(activeConversationIdRef.current) === String(conversationId) ? 'idle' : 'completed_unread'
-    setConversationUiStatus(conversationId, nextStatus)
-  }, [activeConversationIdRef, setConversationUiStatus])
+  const getReadyConversationStatus = useCallback((conversationId) => (
+    String(activeConversationIdRef.current) === String(conversationId) ? 'idle' : 'completed_unread'
+  ), [activeConversationIdRef])
 
   const handleSseEvent = useCallback((rawEvent, conversationId, localUserId, localAssistantId) => {
     const lines = rawEvent.split('\n')
@@ -101,7 +64,7 @@ export default function useMessageStream({
     }
 
     if (event === 'token') {
-      enqueueToken(conversationId, localAssistantId, data)
+      appendToken(conversationId, localAssistantId, data)
     }
 
     if (event === 'done') {
@@ -124,7 +87,7 @@ export default function useMessageStream({
       )
       if (activeConversationIdRef.current === conversationId) showError(message)
     }
-  }, [activeConversationIdRef, enqueueToken, showError, updateConversationMessages])
+  }, [activeConversationIdRef, appendToken, showError, updateConversationMessages])
 
   const nextLocalId = useCallback((prefix) => {
     localIdCounterRef.current += 1
@@ -137,6 +100,7 @@ export default function useMessageStream({
     const localUserId = nextLocalId('local-user')
     const localAssistantId = nextLocalId('local-assistant')
     const abortController = new AbortController()
+    let finalConversationStatus = 'idle'
     generationAbortRef.current = abortController
     setConversationUiStatus(conversation.id, 'generating')
 
@@ -175,17 +139,16 @@ export default function useMessageStream({
         handleSseEvent(buffer, conversation.id, localUserId, localAssistantId)
       }
       await loadConversations()
-      notifyConversationReady(conversation.id)
+      finalConversationStatus = getReadyConversationStatus(conversation.id)
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (abortController.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
         updateConversationMessages(conversation.id, (current) =>
-          current.map((item) =>
-            item.id === localAssistantId
-              ? { ...item, status: 'ECHEC', content: item.content || 'Generation interrompue.' }
-              : item,
-          ),
+          current
+            .map((item) =>
+              item.id === localAssistantId ? { ...item, status: 'TERMINE' } : item,
+            )
+            .filter((item) => item.id !== localAssistantId || item.content.trim()),
         )
-        setConversationUiStatus(conversation.id, 'idle')
         return
       }
       const message = friendlyGenerationError(error)
@@ -195,21 +158,19 @@ export default function useMessageStream({
         ),
       )
       if (activeConversationIdRef.current === conversation.id) showError(message)
-      notifyConversationReady(conversation.id)
     } finally {
-      flushQueuedTokens(localAssistantId, conversation.id)
+      setConversationUiStatus(conversation.id, finalConversationStatus)
       if (generationAbortRef.current === abortController) {
         generationAbortRef.current = null
       }
     }
   }, [
     activeConversationIdRef,
-    flushQueuedTokens,
+    getReadyConversationStatus,
     handleSseEvent,
     loadConversations,
     modelDisplayName,
     nextLocalId,
-    notifyConversationReady,
     setConversationUiStatus,
     showError,
     updateConversationMessages,
@@ -221,8 +182,6 @@ export default function useMessageStream({
 
   useEffect(() => () => {
     generationAbortRef.current?.abort()
-    tokenTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    tokenTimersRef.current.clear()
   }, [])
 
   return {

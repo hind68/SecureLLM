@@ -8,6 +8,7 @@ export default function ConfirmDialog({ cancelLabel, confirmLabel, message, onCa
         aria-labelledby="confirm-modal-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
+        <div className="confirm-modal-icon" aria-hidden="true">!</div>
         <h2 id="confirm-modal-title">{title}</h2>
         <p>{message}</p>
         <div className="confirm-modal-actions">

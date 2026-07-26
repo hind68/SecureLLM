@@ -120,7 +120,7 @@
 .stop-icon {
   width: 13px;
   height: 13px;
-  border-radius: 3px;
+  border-radius: 2px;
   background: currentColor;
   display: block;
 }

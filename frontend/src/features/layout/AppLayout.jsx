@@ -129,6 +129,7 @@ export default function AppLayout({
           goToBottom={chat.goToBottom}
           hasActiveMessages={chat.hasActiveMessages}
           isComposerTransitioning={chat.isComposerTransitioning}
+          isGenerating={status.isGenerating}
           isLastBlockVisible={chat.isLastBlockVisible}
           messages={chat.messages}
           messagesRef={chat.messagesRef}

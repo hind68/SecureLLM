@@ -210,28 +210,13 @@ export default function Sidebar({
             </span>
           </button>
           {isSidebarOpen && isAccountMenuOpen && (
-            <AccountPopover
-              onShowArchived={() => {
-                setShowArchived(true)
-                setShowTabs(true)
-                setIsSidebarOpen(true)
-                setIsAccountMenuOpen(false)
-              }}
-            />
+            <AccountPopover />
           )}
         </div>
       </aside>
 
       {!isSidebarOpen && isAccountMenuOpen && (
-        <AccountPopover
-          className="account-popover-collapsed"
-          onShowArchived={() => {
-            setShowArchived(true)
-            setShowTabs(true)
-            setIsSidebarOpen(true)
-            setIsAccountMenuOpen(false)
-          }}
-        />
+        <AccountPopover className="account-popover-collapsed" />
       )}
 
       {!isSidebarOpen && collapsedPanel && (
@@ -256,12 +241,9 @@ export default function Sidebar({
   )
 }
 
-function AccountPopover({ className = 'account-popover-open', onShowArchived }) {
+function AccountPopover({ className = 'account-popover-open' }) {
   return (
     <div className={`account-popover ${className}`} role="menu" data-menu-root>
-      <button type="button" role="menuitem" onClick={onShowArchived}>
-        Conversations archivees
-      </button>
       <button type="button" role="menuitem">
         Se deconnecter
       </button>

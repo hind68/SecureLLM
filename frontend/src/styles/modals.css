@@ -270,12 +270,15 @@
 
 .decision-box,
 .confirm-modal {
-  width: min(470px, 100%);
-  border: 1px solid #d1d5db;
+  width: min(420px, 100%);
+  max-width: 420px;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  padding: 22px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 32px 24px;
 }
 
 .decision-box {
@@ -283,23 +286,40 @@
 }
 
 .confirm-modal {
-  width: min(380px, 100%);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  width: min(420px, 100%);
+}
+
+.confirm-modal-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background-color: #fee2e2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .decision-box h2,
 .confirm-modal h2 {
   margin: 0 0 8px;
-  font-size: 20px;
+  color: #111827;
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .decision-box p,
 .confirm-modal p {
-  margin: 0 0 18px;
-  color: #5f5f5f;
+  margin: 0 0 32px;
+  color: #6b7280;
+  font-size: 14px;
   line-height: 1.5;
+  text-align: center;
 }
 
 .decision-actions,
@@ -310,16 +330,18 @@
 
 .decision-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 22px;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 0;
 }
 
 .confirm-modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 0;
+  width: 100%;
 }
 
 .decision-actions button,
@@ -335,50 +357,86 @@
 }
 
 .decision-actions button {
-  min-height: 34px;
+  width: 100%;
+  min-height: 0;
   border-radius: 8px;
-  background: transparent;
-  color: #374151;
-  padding: 8px 12px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px;
   font-size: 13.5px;
   font-weight: 500;
+  transition: background-color 0.2s;
 }
 
 .decision-actions button:hover {
+  background: #1e293b;
+}
+
+.decision-actions button:nth-child(2) {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.decision-actions button:nth-child(2):hover {
+  border-color: #9ca3af;
   background: #f3f4f6;
+  color: #111827;
+}
+
+.decision-actions button:nth-child(3) {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  padding: 8px 16px;
+  transition: all 0.15s ease;
+}
+
+.decision-actions button:nth-child(3):hover {
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .confirm-modal-actions button {
-  min-height: 34px;
+  flex: 1;
+  min-height: 42px;
   border-radius: 8px;
-  padding: 8px 16px;
+  padding: 10px 0;
   font-size: 14px;
   font-weight: 500;
 }
 
 .decision-actions .secondary,
 .confirm-modal-actions .secondary {
-  background: #eeeeeb;
   color: #222222;
 }
 
 .decision-actions .secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: transparent;
+  color: #6b7280;
 }
 
 .confirm-modal-actions .secondary {
-  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
   color: #374151;
+  transition: all 0.15s ease;
 }
 
 .confirm-modal-actions .secondary:hover {
-  background: #e5e7eb;
+  border-color: #9ca3af;
+  background: #f3f4f6;
+  color: #111827;
 }
 
 .confirm-modal-actions .danger {
+  border: 0;
   background: #dc2626;
   color: #ffffff;
+  font-weight: 500;
 }
 
 .confirm-modal-actions .danger:hover {
