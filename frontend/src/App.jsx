@@ -22,7 +22,7 @@ import ModelGallery from './components/models/ModelGallery'
 import ModelSelector from './components/models/ModelSelector'
 import useAutoScroll from './hooks/useAutoScroll'
 import useMessageStream from './hooks/useMessageStream'
-import { deletionErrorMessage, friendlyGenerationError, logDevelopmentError, requestErrorMessage, requestStatusMessage } from './utils/errors'
+import { friendlyGenerationError, logDevelopmentError, requestErrorMessage } from './utils/errors'
 import { cleanModelName, displayConversationTitle, selectAvailableModel, titleFrom } from './utils/modelMetadata'
 import { ACTIVE_CONVERSATION_STORAGE_KEY, LAST_MODEL_STORAGE_KEY, SIDEBAR_STORAGE_KEY, clearActiveConversationId, saveActiveConversationId, saveLastModel } from './utils/storage'
 import './App.css'
@@ -473,9 +473,7 @@ function App() {
   async function restoreConversation(conversation) {
     if (!conversation || isGenerating) return
     try {
-      const response = await restoreConversationRequest(conversation.id)
-      if (!response.ok) throw new Error(await requestStatusMessage(response, 'Impossible de desarchiver la conversation.'))
-      const updated = await response.json()
+      const updated = await restoreConversationRequest(conversation.id)
       setConversations((current) => current.filter((item) => item.id !== updated.id))
       if (activeConversation?.id === updated.id) {
         setActiveConversation(updated)
@@ -506,18 +504,7 @@ function App() {
     const conversation = pendingDeleteConversation
     if (!conversation || isGenerating) return
     try {
-      const response = await deleteConversationRequest(conversation.id)
-      if (!response.ok) {
-        const message = await deletionErrorMessage(response)
-        logDevelopmentError('delete conversation failed', {
-          id: conversation.id,
-          method: 'DELETE',
-          status: response.status,
-          url: `/conversations/${conversation.id}/permanent`,
-          message,
-        })
-        throw new Error(message)
-      }
+      await deleteConversationRequest(conversation.id)
       setConversations((current) => current.filter((item) => item.id !== conversation.id))
       if (activeConversation?.id === conversation.id) {
         setActiveConversation(null)
@@ -554,9 +541,7 @@ function App() {
   async function continueWithModel(alias) {
     if (!activeConversation) return
     try {
-      const response = await changeConversationModelRequest(activeConversation.id, alias)
-      if (!response.ok) throw new Error(await requestStatusMessage(response, 'Impossible de changer le modele.'))
-      const updated = await response.json()
+      const updated = await changeConversationModelRequest(activeConversation.id, alias)
       setActiveConversation(updated)
       setSelectedModel(updated.modelAlias)
       saveLastModel(updated.modelAlias)
