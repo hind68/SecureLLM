@@ -1193,28 +1193,24 @@ function App() {
                 {models.map((model) => {
                   const meta = modelCardMeta(model.alias)
                   return (
-                    <article className="model-card" key={model.alias}>
+                    <button
+                      className="model-card"
+                      key={model.alias}
+                      type="button"
+                      onClick={() => {
+                        selectModel(model.alias)
+                        setActiveView('chat')
+                      }}
+                      disabled={isGenerating}
+                    >
                       <div className={`model-card-visual ${meta.tone}`} aria-hidden="true">
                         <ModelLogo alias={model.alias} className="model-card-logo" fallback={meta.initials} />
                       </div>
                       <div className="model-card-copy">
-                        <div className="model-card-topline">
-                          <span>{modelProviderName(model.alias)}</span>
-                        </div>
                         <h3>{model.displayName}</h3>
                         <p>{meta.description}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          selectModel(model.alias)
-                          setActiveView('chat')
-                        }}
-                        disabled={isGenerating}
-                      >
-                        Utiliser ce modele
-                      </button>
-                    </article>
+                    </button>
                   )
                 })}
               </div>

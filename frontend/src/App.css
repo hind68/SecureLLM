@@ -192,65 +192,95 @@
 
 .model-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, 240px);
+  grid-template-columns: repeat(4, 260px);
   justify-content: center;
-  gap: 24px;
+  gap: 28px;
 }
 
 .model-card {
-  width: 240px;
-  min-width: 220px;
-  height: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(4px);
-  box-shadow: 0 12px 34px rgba(35, 44, 58, 0.06);
+  position: relative;
+  width: 260px;
+  min-width: 230px;
+  min-height: 220px;
+  border: 1px solid #f3f4f6;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 58%),
+    radial-gradient(circle at 50% 8%, rgba(16, 185, 129, 0.06), transparent 32%),
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    #ffffff;
+  background-size: auto, auto, 18px 18px, 18px 18px, auto;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 24px;
-  transition: all 0.3s ease;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  overflow: hidden;
+  padding: 32px 24px;
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.model-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.4) 18%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.4) 82%, #ffffff 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 72%);
+  pointer-events: none;
 }
 
 .model-card:hover {
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  transform: translateY(-4px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+.model-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .model-card-visual {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  height: 100px;
+  height: 96px;
   flex-shrink: 0;
-  border-radius: 15px;
+  border-radius: 0;
+  background: transparent;
   display: grid;
   place-items: center;
 }
 
 .model-card-logo {
-  width: min(132px, 82%);
-  height: 58px;
+  width: min(170px, 92%);
+  height: 84px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
 }
 
 .model-card-logo img {
-  width: min(132px, 82%);
-  max-height: 58px;
+  width: min(170px, 92%);
+  max-height: 84px;
   object-fit: contain;
   display: block;
 }
 
 .model-card-logo:not(:has(img)) {
-  width: 45px;
-  height: 45px;
+  width: 62px;
+  height: 62px;
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.58);
   color: #222222;
   display: grid;
   place-items: center;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 720;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
@@ -279,11 +309,24 @@
   background: linear-gradient(135deg, #eef3f8, #fff9f1);
 }
 
+.model-card-visual.tone-openai,
+.model-card-visual.tone-groq,
+.model-card-visual.tone-gemini,
+.model-card-visual.tone-mistral,
+.model-card-visual.tone-claude,
+.model-card-visual.tone-default {
+  background: transparent;
+}
+
 .model-card-copy {
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: 7px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
 .model-card-topline span {
@@ -297,10 +340,10 @@
 }
 
 .model-card h3 {
-  margin: 0;
-  color: #1f1f1f;
-  font-size: 17px;
-  font-weight: 620;
+  margin: 16px 0 0;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -308,31 +351,12 @@
   margin: 0;
   color: #6b7280;
   font-size: 13px;
-  line-height: 1.45;
-}
-
-.model-card > button {
-  min-height: 36px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f3f4f6;
-  color: #1f2937;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 550;
-  margin-top: auto;
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-}
-
-.model-card > button:hover {
-  border-color: #d1d5db;
-  background: #e5e7eb;
-}
-
-.model-card > button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .filters {
