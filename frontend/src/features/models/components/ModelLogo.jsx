@@ -1,10 +1,10 @@
 import { modelLogoSrc } from '../../../utils/modelMetadata'
 
-export default function ModelLogo({ alias, className = '' }) {
+export default function ModelLogo({ alias, className = '', fallback = '' }) {
   const logo = modelLogoSrc(alias)
 
   if (!logo) {
-    return null
+    return fallback ? <span className={className}>{fallback}</span> : null
   }
 
   return (

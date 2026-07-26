@@ -84,7 +84,7 @@ export function modelLogoSrc(alias) {
     'secure-groq': '/assets/groq-logo.png',
     'secure-gemini': '/assets/gemini-provider-logo.png',
     'secure-mistral': '/assets/mistral-provider-logo.png',
-    'secure-claude': '/assets/claude logo.png',
+    'secure-claude': '',
   }
   return logos[alias] || ''
 }
