@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DownArrowIcon } from '../common/icons'
+import { DownArrowIcon } from '../../../components/common/icons'
 
 export default function ModelFilterDropdown({ modelFilter, models, setModelFilter }) {
   const [isModelFilterOpen, setIsModelFilterOpen] = useState(false)

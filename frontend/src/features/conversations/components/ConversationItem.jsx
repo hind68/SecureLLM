@@ -1,4 +1,4 @@
-import { cleanModelName, displayConversationTitle } from '../../utils/modelMetadata'
+import { cleanModelName, displayConversationTitle } from '../../../utils/modelMetadata'
 import ConversationMenu from './ConversationMenu'
 
 export default function ConversationItem({

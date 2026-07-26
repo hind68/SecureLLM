@@ -1,0 +1,44 @@
+﻿/* App shell */
+.app-shell {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #1f1f1f;
+  overflow: hidden;
+}
+
+/* Main chat layout */
+.chat-main {
+  min-width: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  margin-left: var(--sidebar-total-open-width);
+  transition: margin-left 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar-closed .chat-main {
+  margin-left: var(--sidebar-closed-width);
+}
+
+
+/* Chat header */
+.chat-header {
+  min-height: 58px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 24px 0;
+}
+
+.header-controls {
+  position: sticky;
+  top: 10px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+

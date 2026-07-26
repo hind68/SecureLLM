@@ -1,5 +1,5 @@
-import ArchiveTabs from './ArchiveTabs'
-import ConversationList from './ConversationList'
+import ArchiveTabs from '../conversations/components/ArchiveTabs'
+import ConversationList from '../conversations/components/ConversationList'
 
 export default function Sidebar({
   activeConversation,

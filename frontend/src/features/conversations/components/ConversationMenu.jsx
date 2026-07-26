@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DotsIcon } from '../common/icons'
+import { DotsIcon } from '../../../components/common/icons'
 
 export default function ConversationMenu({ id, isOpen, onOpen, onRename, onArchive, onDelete, archiveLabel = 'Archiver' }) {
   const [placement, setPlacement] = useState('bottom')

@@ -1,0 +1,89 @@
+﻿/* History errors */
+.history-error {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 6px;
+}
+
+/* History error retry */
+.history-error {
+  color: #7c3f12;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.history-error button {
+  width: fit-content;
+  border: 0;
+  border-radius: 999px;
+  background: #7c3f12;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+/* Toast and inline feedback */
+.inline-error {
+  position: fixed;
+  z-index: 60;
+  right: 24px;
+  bottom: 24px;
+  width: min(380px, calc(100vw - 48px));
+  border: 1px solid rgba(185, 28, 28, 0.14);
+  border-radius: 12px;
+  background: #fff6f6;
+  color: #8f1d1d;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 9px 9px 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.09);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.inline-error.success {
+  border-color: rgba(22, 101, 52, 0.14);
+  background: #f3fbf6;
+  color: #17633a;
+}
+
+.inline-error > span {
+  min-width: 0;
+}
+
+.inline-error button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.inline-error button:hover {
+  background: rgba(127, 29, 29, 0.08);
+}
+
+.inline-error.success button:hover {
+  background: rgba(22, 101, 52, 0.08);
+}
+
+.inline-error .close-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.inline-error .close-icon::before,
+.inline-error .close-icon::after {
+  width: 14px;
+}
+
+

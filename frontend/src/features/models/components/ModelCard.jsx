@@ -1,5 +1,5 @@
 import ModelLogo from './ModelLogo'
-import { modelCardMeta } from '../../utils/modelMetadata'
+import { modelCardMeta } from '../../../utils/modelMetadata'
 
 export default function ModelCard({ disabled, model, onSelect }) {
   const meta = modelCardMeta(model.alias)

@@ -1,4 +1,4 @@
-import { modelProviderName } from '../../utils/modelMetadata'
+import { modelProviderName } from '../../../utils/modelMetadata'
 
 export default function ModelSelector({ activeModel, disabled, isOpen, models, onToggle, onSelect }) {
   return (

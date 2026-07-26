@@ -1,4 +1,4 @@
-import { modelLogoSrc } from '../../utils/modelMetadata'
+import { modelLogoSrc } from '../../../utils/modelMetadata'
 
 export default function ModelLogo({ alias, className = '' }) {
   const logo = modelLogoSrc(alias)

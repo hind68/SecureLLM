@@ -1,6 +1,6 @@
-import ModelFilterDropdown from '../models/ModelFilterDropdown'
+import ModelFilterDropdown from '../../models/components/ModelFilterDropdown'
 import ArchiveTabs from './ArchiveTabs'
-import { cleanModelName, displayConversationTitle } from '../../utils/modelMetadata'
+import { cleanModelName, displayConversationTitle } from '../../../utils/modelMetadata'
 
 export default function SearchModal({
   conversations,

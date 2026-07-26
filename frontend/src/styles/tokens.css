@@ -1,0 +1,24 @@
+﻿/* Global tokens */
+:root {
+  --ui-blue-900: #243b6b;
+  --ui-blue-100: #edf3ff;
+  --ui-blue-150: #e5eefc;
+  --ui-orange-600: #c46b36;
+  --ui-orange-700: #b85d2b;
+  --sidebar-surface: rgba(250, 252, 255, 0.88);
+  --sidebar-surface-strong: rgba(255, 255, 255, 0.72);
+  --sidebar-hover: rgba(32, 37, 47, 0.055);
+  --sidebar-divider: rgba(37, 48, 67, 0.075);
+  --badge-surface: rgba(39, 45, 56, 0.065);
+}
+
+/* App-scoped layout tokens */
+.app-shell {
+  --sidebar-closed-width: 56px;
+  --sidebar-open-width: 248px;
+  --sidebar-total-open-width: 248px;
+  --chat-content-width: 760px;
+  --assistant-content-width: 736px;
+  --border-subtle: rgba(31, 41, 55, 0.08);
+}
+

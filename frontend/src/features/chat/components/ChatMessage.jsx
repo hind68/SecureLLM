@@ -1,8 +1,8 @@
-import { CopyIcon } from '../common/icons'
-import ModelLogo from '../models/ModelLogo'
+import { CopyIcon } from '../../../components/common/icons'
+import ModelLogo from '../../models/components/ModelLogo'
 import MarkdownContent from './MarkdownContent'
-import { cleanModelName, modelCardMeta } from '../../utils/modelMetadata'
-import { detectTextDirection } from '../../utils/markdown'
+import { cleanModelName, modelCardMeta } from '../../../utils/modelMetadata'
+import { detectTextDirection } from '../../../utils/markdown'
 
 export default function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
   const isUser = message.role === 'USER'

@@ -1,4 +1,4 @@
-import { StopIcon } from '../common/icons'
+import { StopIcon } from '../../../components/common/icons'
 
 export default function ChatComposer({
   canSend,

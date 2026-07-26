@@ -1,4 +1,4 @@
-import { DownArrowIcon } from '../common/icons'
+import { DownArrowIcon } from '../../../components/common/icons'
 import ChatMessage from './ChatMessage'
 
 export default function ChatThread({

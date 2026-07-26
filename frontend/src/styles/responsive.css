@@ -1,0 +1,104 @@
+﻿/* Touch and motion preferences */
+@media (hover: none) {
+  .message-actions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-indicator span {
+    animation: none;
+  }
+}
+
+
+/* Tablet and mobile layout */
+@media (max-width: 820px) {
+  .mobile-overlay {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-main,
+  .sidebar-closed .chat-main {
+    margin-left: 56px;
+  }
+
+  .chat-header {
+    padding-right: 14px;
+  }
+
+  .model-button {
+    max-width: 170px;
+  }
+
+  .composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .search-modal {
+    --modal-x-padding: 14px;
+    border-radius: 16px;
+  }
+
+  .search-modal-input {
+    font-size: 16px;
+  }
+
+  .search-modal-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-header {
+    left: -4px;
+  }
+
+  .composer-center,
+  .sidebar-closed .composer-center {
+    left: calc(56px + (100vw - 56px) / 2);
+  }
+}
+
+
+/* Sidebar mobile layout */
+@media (max-width: 820px) {
+  .sidebar {
+    width: min(var(--sidebar-open-width), calc(100vw - 48px));
+    box-shadow: 20px 0 60px rgba(0, 0, 0, 0.16);
+  }
+
+  .sidebar-closed .sidebar {
+    width: var(--sidebar-closed-width);
+    box-shadow: none;
+  }
+
+  .model-gallery {
+    width: min(100%, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    overflow-y: auto;
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .model-gallery-header {
+    margin-bottom: 18px;
+  }
+
+  .model-gallery-header h2 {
+    font-size: 21px;
+  }
+
+  .model-card-grid {
+    justify-content: stretch;
+  }
+
+  .model-card {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
