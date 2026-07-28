@@ -14,6 +14,9 @@ import com.example.backend.enums.RoleMessage;
 import com.example.backend.enums.StatutConversation;
 import com.example.backend.enums.StatutMessage;
 import com.example.backend.enums.StatutModeleLlm;
+import com.example.backend.integration.dlp.DlpAnalysisException;
+import com.example.backend.integration.dlp.DlpBlockedException;
+import com.example.backend.integration.dlp.DlpUnavailableException;
 import com.example.backend.integration.litellm.LiteLlmMessage;
 import com.example.backend.integration.litellm.LiteLlmService;
 import com.example.backend.entity.Utilisateur;
@@ -48,6 +51,7 @@ public class ConversationService {
     private final ModeleLlmRepository modeleLlmRepository;
     private final DemoUserProvider demoUserProvider;
     private final LiteLlmService liteLlmService;
+    private final DlpService dlpService;
     private final MessagePersistenceService messagePersistenceService;
     private final int maxContextMessages;
 
@@ -57,6 +61,7 @@ public class ConversationService {
             ModeleLlmRepository modeleLlmRepository,
             DemoUserProvider demoUserProvider,
             LiteLlmService liteLlmService,
+            DlpService dlpService,
             MessagePersistenceService messagePersistenceService,
             @Value("${gateway.context.max-messages:20}") int maxContextMessages
     ) {
@@ -65,6 +70,7 @@ public class ConversationService {
         this.modeleLlmRepository = modeleLlmRepository;
         this.demoUserProvider = demoUserProvider;
         this.liteLlmService = liteLlmService;
+        this.dlpService = dlpService;
         this.messagePersistenceService = messagePersistenceService;
         this.maxContextMessages = maxContextMessages;
     }
@@ -172,6 +178,7 @@ public class ConversationService {
         }
 
         ModeleLlm generationModel = conversation.getModele();
+        String safeContent = dlpService.safeTextForLlm(content, conversation.getUtilisateur().getExternalId());
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
         Message userMessage = messageRepository.save(new Message(
                 conversation,
@@ -197,7 +204,7 @@ public class ConversationService {
         ));
         conversation.touchLastMessageAt(Instant.now());
 
-        List<LiteLlmMessage> context = buildContext(conversation);
+        List<LiteLlmMessage> context = buildContext(conversation, userMessage, safeContent);
         return new StreamPreparation(
                 generationModel.getAliasInterne(),
                 assistantMessage.getId(),
@@ -209,8 +216,16 @@ public class ConversationService {
 
     @Transactional
     public SseEmitter streamMessage(Long conversationId, SendMessageRequest request) {
-        StreamPreparation preparation = prepareStream(conversationId, request);
         SseEmitter emitter = new SseEmitter(0L);
+        StreamPreparation preparation;
+        try {
+            preparation = prepareStream(conversationId, request);
+        } catch (DlpAnalysisException exception) {
+            trySend(emitter, "error", streamError(exception));
+            emitter.complete();
+            return emitter;
+        }
+
         StringBuilder answer = new StringBuilder();
 
         trySend(emitter, "message", preparation.userMessage());
@@ -239,7 +254,7 @@ public class ConversationService {
         return emitter;
     }
 
-    private List<LiteLlmMessage> buildContext(Conversation conversation) {
+    private List<LiteLlmMessage> buildContext(Conversation conversation, Message safeMessage, String safeContent) {
         List<Message> finishedMessages = messageRepository.findByConversationAndStatutAndRoleInOrderByOrdreAsc(
                 conversation,
                 StatutMessage.TERMINE,
@@ -248,9 +263,24 @@ public class ConversationService {
         int fromIndex = Math.max(0, finishedMessages.size() - maxContextMessages);
         List<LiteLlmMessage> context = new ArrayList<>();
         for (Message message : finishedMessages.subList(fromIndex, finishedMessages.size())) {
-            context.add(new LiteLlmMessage(message.getRole().name().toLowerCase(), message.getContenu()));
+            String content = safeContextContent(message, safeMessage, safeContent);
+            context.add(new LiteLlmMessage(message.getRole().name().toLowerCase(), content));
         }
         return context;
+    }
+
+    private String safeContextContent(Message message, Message currentUserMessage, String currentSafeContent) {
+        if (isSameMessage(message, currentUserMessage)) {
+            return currentSafeContent;
+        }
+        return dlpService.safeTextForLlm(message.getContenu(), message.getConversation().getUtilisateur().getExternalId());
+    }
+
+    private boolean isSameMessage(Message candidate, Message reference) {
+        if (candidate == reference) {
+            return true;
+        }
+        return candidate.getId() != null && candidate.getId().equals(reference.getId());
     }
 
     private Conversation ownedConversation(Long id) {
@@ -302,6 +332,31 @@ public class ConversationService {
         }
     }
 
+    private StreamErrorResponse streamError(DlpAnalysisException exception) {
+        if (exception instanceof DlpBlockedException blockedException) {
+            return new StreamErrorResponse(
+                    "DLP_BLOCKED",
+                    "Votre message contient une donnée sensible et ne peut pas être envoyé.",
+                    blockedException.getDetectedTypes(),
+                    blockedException.getHighestSeverity()
+            );
+        }
+        if (exception instanceof DlpUnavailableException) {
+            return new StreamErrorResponse(
+                    "DLP_UNAVAILABLE",
+                    "Le controle de securite est indisponible. Le message n'a pas ete envoye au modele.",
+                    Set.of(),
+                    null
+            );
+        }
+        return new StreamErrorResponse(
+                "DLP_ERROR",
+                "Le controle de securite n'a pas pu analyser le message. Le message n'a pas ete envoye au modele.",
+                Set.of(),
+                null
+        );
+    }
+
     private String normalizeTitle(String title, String fallback) {
         String value = title == null || title.isBlank() ? fallback : title.trim();
         return value.length() > 160 ? value.substring(0, 160) : value;
@@ -350,6 +405,14 @@ public class ConversationService {
     public record StreamDoneResponse(
             Long messageId,
             String content
+    ) {
+    }
+
+    public record StreamErrorResponse(
+            String code,
+            String message,
+            Set<String> detectedTypes,
+            String highestSeverity
     ) {
     }
 }

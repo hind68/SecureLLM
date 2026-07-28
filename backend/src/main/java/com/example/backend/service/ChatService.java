@@ -18,10 +18,19 @@ public class ChatService {
 
     private final LiteLlmService liteLlmService;
     private final ModeleLlmRepository modeleLlmRepository;
+    private final DlpService dlpService;
+    private final DemoUserProvider demoUserProvider;
 
-    public ChatService(LiteLlmService liteLlmService, ModeleLlmRepository modeleLlmRepository) {
+    public ChatService(
+            LiteLlmService liteLlmService,
+            ModeleLlmRepository modeleLlmRepository,
+            DlpService dlpService,
+            DemoUserProvider demoUserProvider
+    ) {
         this.liteLlmService = liteLlmService;
         this.modeleLlmRepository = modeleLlmRepository;
+        this.dlpService = dlpService;
+        this.demoUserProvider = demoUserProvider;
     }
 
     public List<String> getAvailableModels() {
@@ -43,7 +52,8 @@ public class ChatService {
             throw new ResponseStatusException(BAD_REQUEST, "Unsupported model: " + request.model());
         }
 
-        String answer = liteLlmService.chat(request.model(), request.message());
+        String safeMessage = dlpService.safeTextForLlm(request.message(), demoUserProvider.currentUser().getExternalId());
+        String answer = liteLlmService.chat(request.model(), safeMessage);
         return new ChatResponse(request.model(), answer);
     }
 }

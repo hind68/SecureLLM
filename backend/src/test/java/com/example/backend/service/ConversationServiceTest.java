@@ -11,6 +11,8 @@ import com.example.backend.enums.RoleMessage;
 import com.example.backend.enums.StatutFournisseurLlm;
 import com.example.backend.enums.StatutMessage;
 import com.example.backend.enums.StatutModeleLlm;
+import com.example.backend.integration.dlp.DlpBlockedException;
+import com.example.backend.integration.dlp.DlpUnavailableException;
 import com.example.backend.integration.litellm.LiteLlmMessage;
 import com.example.backend.integration.litellm.LiteLlmService;
 import com.example.backend.entity.Utilisateur;
@@ -19,10 +21,18 @@ import com.example.backend.repository.MessageRepository;
 import com.example.backend.repository.ModeleLlmRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,7 +44,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +67,9 @@ class ConversationServiceTest {
 
     @Mock
     private LiteLlmService liteLlmService;
+
+    @Mock
+    private DlpService dlpService;
 
     @Mock
     private MessagePersistenceService messagePersistenceService;
@@ -80,9 +95,12 @@ class ConversationServiceTest {
                 modeleLlmRepository,
                 demoUserProvider,
                 liteLlmService,
+                dlpService,
                 messagePersistenceService,
                 10
         );
+        lenient().when(demoUser.getExternalId()).thenReturn("demo-user");
+        lenient().when(dlpService.safeTextForLlm(any(), eq("demo-user"))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -232,6 +250,162 @@ class ConversationServiceTest {
     }
 
     @Test
+    void prepareStreamUsesMaskedCurrentPromptOnlyForLiteLlmContext() {
+        AtomicReference<Message> savedUserMessage = new AtomicReference<>();
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(messageRepository.findMaxOrdre(conversation)).thenReturn(0);
+        when(dlpService.safeTextForLlm("Mon secret est 1234", "demo-user")).thenReturn("Mon secret est [MASKED]");
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message message = invocation.getArgument(0);
+            if (message.getRole() == RoleMessage.USER) {
+                savedUserMessage.set(message);
+            }
+            return message;
+        });
+        when(messageRepository.findByConversationAndStatutAndRoleInOrderByOrdreAsc(eq(conversation), eq(StatutMessage.TERMINE), any()))
+                .thenAnswer(invocation -> List.of(savedUserMessage.get()));
+
+        var preparation = service.prepareStream(10L, new SendMessageRequest("Mon secret est 1234"));
+
+        assertThat(preparation.userMessage().content()).isEqualTo("Mon secret est 1234");
+        assertThat(preparation.context())
+                .extracting(LiteLlmMessage::content)
+                .containsExactly("Mon secret est [MASKED]");
+    }
+
+    @Test
+    void streamMessageSendsAllowedTextToLiteLlm() {
+        List<LiteLlmMessage> payload = streamAndCaptureLiteLlmPayload(
+                List.of(),
+                "Texte normal",
+                "Texte normal"
+        );
+
+        assertThat(payload)
+                .extracting(LiteLlmMessage::content)
+                .contains("Texte normal");
+    }
+
+    @Test
+    void streamMessageNeverSendsMaskedCurrentEmailToLiteLlm() {
+        List<LiteLlmMessage> payload = streamAndCaptureLiteLlmPayload(
+                List.of(),
+                "Mon email est client@example.com",
+                "Mon email est [EMAIL]"
+        );
+
+        assertThat(payload)
+                .extracting(LiteLlmMessage::content)
+                .doesNotContain("Mon email est client@example.com")
+                .contains("Mon email est [EMAIL]");
+        assertThat(joinPayload(payload)).doesNotContain("client@example.com");
+    }
+
+    @ParameterizedTest
+    @MethodSource("historicalSensitiveMessages")
+    void streamMessageNeverSendsSensitiveHistoryToLiteLlm(String original, String masked, String forbidden) {
+        Message previousUser = new Message(conversation, RoleMessage.USER, 1, StatutMessage.TERMINE, original, null);
+        List<LiteLlmMessage> payload = streamAndCaptureLiteLlmPayload(
+                List.of(previousUser),
+                "redonne-moi cette information",
+                "redonne-moi cette information",
+                original,
+                masked
+        );
+
+        assertThat(joinPayload(payload)).doesNotContain(forbidden);
+        assertThat(payload)
+                .extracting(LiteLlmMessage::content)
+                .contains(masked, "redonne-moi cette information");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "Le mot CIN peut designer une carte nationale sans numero.",
+            "Cette API publique documente un modele de test.",
+            "La carte du site montre les sections techniques.",
+            "Le numero de ticket INC-2026-0001 est interne.",
+            "Le nom du modele est secure-gemini."
+    })
+    void streamMessageKeepsStreamingForNormalTechnicalPhrasesWhenDlpAllows(String prompt) {
+        List<LiteLlmMessage> payload = streamAndCaptureLiteLlmPayload(
+                List.of(),
+                prompt,
+                prompt
+        );
+
+        assertThat(payload)
+                .extracting(LiteLlmMessage::content)
+                .contains(prompt);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "Ma CIN est AB123456,moroccan_cin",
+            "Ma carte est 4111111111111111,credit_card",
+            "Ma cle API est sk-proj-abcdefghijklmnopqrstuvwxyz1234567890,openai_api_key"
+    })
+    void streamMessageDoesNotCallLiteLlmWhenDlpBlocksSensitiveInput(String prompt, String type) {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeTextForLlm(prompt, "demo-user"))
+                .thenThrow(new DlpBlockedException("HIGH", Set.of(type)));
+
+        service.streamMessage(10L, new SendMessageRequest(prompt));
+
+        verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "timeout",
+            "http-500",
+            "invalid-json",
+            "unknown-decision",
+            "status-error"
+    })
+    void streamMessageDoesNotCallLiteLlmWhenDlpIsUnavailable(String failureMode) {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeTextForLlm("Bonjour", "demo-user"))
+                .thenThrow(new DlpUnavailableException("DLP failure: " + failureMode));
+
+        service.streamMessage(10L, new SendMessageRequest("Bonjour"));
+
+        verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
+    void streamMessageDlpFailureDoesNotEmitPartialTokens() {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeTextForLlm("Ma CIN est AB123456", "demo-user"))
+                .thenThrow(new DlpBlockedException("HIGH", Set.of("moroccan_cin")));
+
+        service.streamMessage(10L, new SendMessageRequest("Ma CIN est AB123456"));
+
+        verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
+        verify(messagePersistenceService, never()).completeAssistantMessage(any(), any());
+        verify(messagePersistenceService, never()).failAssistantMessage(any(), any());
+    }
+
+    @Test
+    void streamMessageDoesNotCallLiteLlmWhenDlpBlocks() {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeTextForLlm("secret", "demo-user"))
+                .thenThrow(new DlpBlockedException("HIGH", Set.of("API_KEY")));
+
+        service.streamMessage(10L, new SendMessageRequest("secret"));
+
+        verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
+        verify(messageRepository, never()).save(any(Message.class));
+    }
+
+    @Test
     void streamMessageCompletesAssistantMessageWhenLiteLlmFinishes() {
         when(demoUserProvider.currentUser()).thenReturn(demoUser);
         when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
@@ -279,6 +453,76 @@ class ConversationServiceTest {
         assertThatThrownBy(() -> service.messages(99L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Conversation not found");
+    }
+
+    private List<LiteLlmMessage> streamAndCaptureLiteLlmPayload(
+            List<Message> previousMessages,
+            String prompt,
+            String safePrompt
+    ) {
+        return streamAndCaptureLiteLlmPayload(previousMessages, prompt, safePrompt, null, null);
+    }
+
+    private List<LiteLlmMessage> streamAndCaptureLiteLlmPayload(
+            List<Message> previousMessages,
+            String prompt,
+            String safePrompt,
+            String historicalOriginal,
+            String historicalMasked
+    ) {
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(messageRepository.findMaxOrdre(conversation)).thenReturn(previousMessages.size());
+        when(dlpService.safeTextForLlm(prompt, "demo-user")).thenReturn(safePrompt);
+        if (historicalOriginal != null) {
+            when(dlpService.safeTextForLlm(historicalOriginal, "demo-user")).thenReturn(historicalMasked);
+        }
+        AtomicReference<Message> savedUserMessage = new AtomicReference<>();
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message message = invocation.getArgument(0);
+            if (message.getRole() == RoleMessage.USER) {
+                savedUserMessage.set(message);
+            }
+            return message;
+        });
+        when(messageRepository.findByConversationAndStatutAndRoleInOrderByOrdreAsc(eq(conversation), eq(StatutMessage.TERMINE), any()))
+                .thenAnswer(invocation -> {
+                    List<Message> messages = new java.util.ArrayList<>(previousMessages);
+                    if (savedUserMessage.get() != null) {
+                        messages.add(savedUserMessage.get());
+                    }
+                    return messages;
+                });
+
+        ArgumentCaptor<List<LiteLlmMessage>> payloadCaptor = ArgumentCaptor.captor();
+        doAnswer(invocation -> {
+            Runnable onComplete = invocation.getArgument(3);
+            onComplete.run();
+            return null;
+        }).when(liteLlmService).streamChat(eq("secure-groq"), payloadCaptor.capture(), any(), any(), any());
+
+        service.streamMessage(10L, new SendMessageRequest(prompt));
+
+        verify(liteLlmService, times(1)).streamChat(eq("secure-groq"), any(), any(), any(), any());
+        return payloadCaptor.getValue();
+    }
+
+    private String joinPayload(List<LiteLlmMessage> payload) {
+        return payload.stream()
+                .map(LiteLlmMessage::content)
+                .reduce("", (left, right) -> left + "\n" + right);
+    }
+
+    private static Stream<Arguments> historicalSensitiveMessages() {
+        return Stream.of(
+                Arguments.of("Mon email est client@example.com", "Mon email est [EMAIL]", "client@example.com"),
+                Arguments.of("Mon telephone est 0612345678", "Mon telephone est [PHONE]", "0612345678"),
+                Arguments.of("Mon RIB est 007780000004567890123456", "Mon RIB est [RIB]", "007780000004567890123456"),
+                Arguments.of("Mon IBAN est MA64011519000001205000534921", "Mon IBAN est [IBAN]", "MA64011519000001205000534921"),
+                Arguments.of("La personne est Jean Dupont", "La personne est [PERSON]", "Jean Dupont"),
+                Arguments.of("Adresse IP 192.168.1.24", "Adresse IP [IP_ADDRESS]", "192.168.1.24"),
+                Arguments.of("Token ghp_abcdefghijklmnopqrstuvwxyz123456", "Token [TOKEN]", "ghp_abcdefghijklmnopqrstuvwxyz123456")
+        );
     }
 }
 

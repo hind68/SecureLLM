@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { streamConversationMessage } from '../../../api/conversationsApi'
 import { friendlyGenerationError } from '../../../utils/errors'
+import { dlpUserMessage } from '../utils/dlpErrors'
 import { extractSseData, parseJson } from '../utils/sse'
 
 /**
@@ -79,7 +80,7 @@ export default function useMessageStream({
     }
 
     if (event === 'error') {
-      const message = friendlyGenerationError(jsonData)
+      const message = dlpUserMessage(jsonData) || friendlyGenerationError(jsonData)
       updateConversationMessages(conversationId, (current) =>
         current.map((item) =>
           item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || message } : item,
