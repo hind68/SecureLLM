@@ -110,7 +110,10 @@ def build_moroccan_recognizers() -> list[PatternRecognizer]:
         PatternRecognizer(
             supported_entity=MOROCCAN_RIB,
             name="Moroccan RIB recognizer",
-            patterns=[Pattern("moroccan_rib", r"(?i)\b(?:rib|compte bancaire|coordonnees bancaires|bank account)\b[^0-9]{0,24}(\d{3}\s+\d{3}\s+\d{10,16}\s+\d{2})\b", 0.75)],
+            patterns=[
+                Pattern("moroccan_rib_spaced", r"(?i)\b(?:rib|compte bancaire|coordonnees bancaires|coordonnées bancaires|bank account)\b[^0-9]{0,24}(\d{3}\s+\d{3}\s+\d{10,16}\s+\d{2})\b", 0.75),
+                Pattern("moroccan_rib_compact", r"(?i)\b(?:rib|compte bancaire|coordonnees bancaires|coordonnées bancaires|bank account)\b[^0-9]{0,24}(\d{24})\b", 0.75),
+            ],
             supported_language="fr",
             context=["rib", "compte bancaire", "coordonnees bancaires", "bank account"],
         ),

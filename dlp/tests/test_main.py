@@ -68,7 +68,7 @@ def test_moroccan_cin_exact_text_blocks_and_masks(monkeypatch):
     assert data["decision"] == "BLOCK"
     assert data["flagged"] is True
     assert data["highest_severity"] == "high"
-    assert data["masked_text"] == "Le numero de CIN du client est [MOROCCAN_CIN_1_REDACTED]."
+    assert data["masked_text"] == "Le numero de CIN du client est [MOROCCAN_CIN_1]."
     assert any(match["type"] == "moroccan_cin" and match["severity"] == "high" for match in data["matches"])
 
 
@@ -122,6 +122,76 @@ def test_technical_secrets_block(monkeypatch):
     assert data["decision"] == "BLOCK"
     assert data["highest_severity"] == "high"
     assert any(match["severity"] == "high" for match in data["matches"])
+
+
+def test_confirmed_false_positive_phrases_are_allowed():
+    examples = [
+        "Explique-moi simplement le principe.",
+        "Donne-moi le numero de carte.",
+        "Spring Boot utilise Java.",
+        "GitHub utilise parfois le prefixe ghp_.",
+    ]
+
+    for text in examples:
+        data = client.post("/analyse", json={"text": text}).json()
+        assert data["decision"] == "ALLOW"
+        assert data["matches"] == []
+
+
+def test_labeled_compact_rib_blocks_without_exposing_value(monkeypatch):
+    _disable_presidio(monkeypatch)
+    data = client.post("/analyse", json={"text": "Mon RIB est 007780000045678901234567."}).json()
+
+    assert data["decision"] == "BLOCK"
+    assert any(match["type"] == "bank_account" for match in data["matches"])
+    assert "007780000045678901234567" not in str(data["matches"])
+    assert "007780000045678901234567" not in data["masked_text"]
+
+
+def test_private_key_headers_block(monkeypatch):
+    _disable_presidio(monkeypatch)
+
+    for header in [
+        "-----BEGIN PRIVATE KEY-----",
+        "-----BEGIN RSA PRIVATE KEY-----",
+        "-----BEGIN OPENSSH PRIVATE KEY-----",
+    ]:
+        data = client.post("/analyse", json={"text": header}).json()
+        assert data["decision"] == "BLOCK"
+        assert any(match["type"] == "private_key" for match in data["matches"])
+        assert header not in str(data["matches"])
+
+
+def test_technical_secret_types_are_distinct_in_analyse(monkeypatch):
+    _disable_presidio(monkeypatch)
+    text = (
+        "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz1234567890 "
+        "GitHub token ghp_abcdefghijklmnopqrstuvwxyz123456 "
+        "JWT eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue123456 "
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456"
+    )
+    data = client.post("/analyse", json={"text": text}).json()
+    types = {match["type"] for match in data["matches"]}
+
+    assert data["decision"] == "BLOCK"
+    assert {"openai_api_key", "github_token", "jwt_token", "bearer_token"}.issubset(types)
+
+
+def test_ip_policy_currently_blocks_and_is_documented(monkeypatch):
+    _disable_presidio(monkeypatch)
+    data = client.post("/analyse", json={"text": "Adresse IP 192.168.1.24"}).json()
+
+    assert data["decision"] == "BLOCK"
+    assert any(match["type"] == "ip_address" and match["severity"] == "high" for match in data["matches"])
+
+
+def test_contact_sentence_detects_person_and_email():
+    data = client.post("/analyse", json={"text": "Contactez Jean Dupont a client@example.com"}).json()
+    types = {match["type"] for match in data["matches"]}
+
+    assert data["decision"] in {"MASK", "BLOCK"}
+    assert "person_name" in types
+    assert "email" in types
 
 
 def test_arabic_text_uses_regex_without_french_nlp(monkeypatch):

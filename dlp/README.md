@@ -29,7 +29,7 @@ Typical response:
   "decision": "MASK",
   "flagged": true,
   "highest_severity": "medium",
-  "masked_text": "Mon adresse est [EMAIL_1_REDACTED]",
+  "masked_text": "Mon adresse est [EMAIL_1]",
   "matches": [
     {
       "id": "email_1",

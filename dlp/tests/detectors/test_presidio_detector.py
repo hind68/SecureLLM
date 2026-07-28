@@ -24,6 +24,16 @@ class FakeAcronymAnalyzer:
         return [FakeResult("LOCATION", 0, 3, 0.85)]
 
 
+class FakeGenericFalsePositiveAnalyzer:
+    def __init__(self, entity_type, value):
+        self.entity_type = entity_type
+        self.value = value
+
+    def analyze(self, text, language):
+        start = text.index(self.value)
+        return [FakeResult(self.entity_type, start, start + len(self.value), 0.85)]
+
+
 def test_presidio_mapping_without_sensitive_value(monkeypatch):
     monkeypatch.setattr(detector, "get_analyzer", lambda: FakeAnalyzer())
     matches = detector.detect_with_presidio("Sarah aaa client@example.com", language="en")
@@ -46,6 +56,27 @@ def test_isolated_cin_acronym_is_not_returned_as_location(monkeypatch):
     matches = detector.detect_with_presidio("CIN", language="fr")
 
     assert matches == []
+
+
+def test_generic_nlp_false_positives_are_filtered(monkeypatch):
+    examples = [
+        ("Explique-moi simplement le concept.", "LOCATION", "Explique"),
+        ("Donne-moi le numero de carte.", "PERSON", "Donne"),
+        ("Spring Boot utilise Java.", "PERSON", "Java"),
+        ("GitHub utilise parfois le prefixe ghp_.", "ORGANIZATION", "ghp"),
+    ]
+
+    for text, entity_type, value in examples:
+        monkeypatch.setattr(detector, "get_analyzer", lambda entity_type=entity_type, value=value: FakeGenericFalsePositiveAnalyzer(entity_type, value))
+        assert detector.detect_with_presidio(text, language="fr") == []
+
+
+def test_person_name_detection_is_not_disabled(monkeypatch):
+    monkeypatch.setattr(detector, "get_analyzer", lambda: FakeGenericFalsePositiveAnalyzer("PERSON", "Jean Dupont"))
+
+    matches = detector.detect_with_presidio("Contactez Jean Dupont a client@example.com", language="fr")
+
+    assert any(match["type"] == "person_name" for match in matches)
 
 
 def test_moroccan_cin_recognizer_returns_only_number_span():

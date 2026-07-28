@@ -16,7 +16,7 @@ def build_technical_secret_recognizers() -> list[PatternRecognizer]:
         PatternRecognizer(
             supported_entity=OPENAI_API_KEY,
             name="OpenAI API key recognizer",
-            patterns=[Pattern("openai_api_key", r"\bsk-[A-Za-z0-9]{20,}\b", 0.9)],
+            patterns=[Pattern("openai_api_key", r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}\b", 0.9)],
             supported_language="en",
         ),
         PatternRecognizer(
@@ -28,19 +28,22 @@ def build_technical_secret_recognizers() -> list[PatternRecognizer]:
         PatternRecognizer(
             supported_entity=GITHUB_TOKEN,
             name="GitHub token recognizer",
-            patterns=[Pattern("github_token", r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,71}\b", 0.9)],
+            patterns=[Pattern("github_token", r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,71}\b", 0.9)],
             supported_language="en",
         ),
         PatternRecognizer(
             supported_entity=JWT_TOKEN,
             name="JWT recognizer",
-            patterns=[Pattern("jwt_token", r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.=-]{20,}\b", 0.9)],
+            patterns=[Pattern("jwt_token", r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.=-]{8,}\b", 0.9)],
             supported_language="en",
         ),
         PatternRecognizer(
             supported_entity=PRIVATE_KEY,
             name="Private key recognizer",
-            patterns=[Pattern("private_key", r"(?s)-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", 0.95)],
+            patterns=[
+                Pattern("private_key", r"(?s)-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", 0.95),
+                Pattern("private_key_header", r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", 0.9),
+            ],
             supported_language="en",
         ),
         PatternRecognizer(

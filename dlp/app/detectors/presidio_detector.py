@@ -1,4 +1,5 @@
 from app.detectors.presidio_config import SUPPORTED_NLP_LANGUAGES, get_analyzer, warm_up_analyzer
+from app.policy import severity_for
 
 
 ENTITY_TYPE_MAP = {
@@ -18,34 +19,14 @@ ENTITY_TYPE_MAP = {
     "MOROCCAN_IBAN": "iban",
     "MOROCCAN_RIB": "bank_account",
     "MOROCCAN_BIC_SWIFT": "bic_swift",
-    "OPENAI_API_KEY": "api_key",
+    "OPENAI_API_KEY": "openai_api_key",
     "AWS_ACCESS_KEY": "api_key",
-    "GITHUB_TOKEN": "api_key",
+    "GITHUB_TOKEN": "github_token",
     "JWT_TOKEN": "jwt_token",
     "PRIVATE_KEY": "private_key",
     "HARDCODED_PASSWORD": "hardcoded_password",
     "DATABASE_CONNECTION_STRING": "connection_string",
-    "BEARER_TOKEN": "api_key",
-}
-
-SEVERITY_MAP = {
-    "credit_card": "high",
-    "iban": "high",
-    "moroccan_cin": "high",
-    "api_key": "high",
-    "private_key": "high",
-    "jwt_token": "high",
-    "hardcoded_password": "high",
-    "connection_string": "high",
-    "bank_account": "high",
-    "bic_swift": "high",
-    "email": "medium",
-    "phone_number": "medium",
-    "person_name": "medium",
-    "ip_address": "medium",
-    "location": "low",
-    "url": "low",
-    "organization": "low",
+    "BEARER_TOKEN": "bearer_token",
 }
 
 _NLP_ACRONYM_FALSE_POSITIVES = {
@@ -60,6 +41,28 @@ _NLP_ACRONYM_FALSE_POSITIVES = {
     "HTTP",
     "HTTPS",
     "IP",
+    "GHP",
+}
+
+_NLP_SINGLE_TOKEN_FALSE_POSITIVES = {
+    "donne",
+    "donnez",
+    "explique",
+    "expliquez",
+    "java",
+    "spring",
+    "spring boot",
+    "github",
+    "openai",
+    "gitlab",
+    "docker",
+    "kubernetes",
+    "python",
+    "javascript",
+    "typescript",
+    "maven",
+    "gradle",
+    "litellm",
 }
 
 _GENERIC_NLP_ENTITY_TYPES = {"PERSON", "LOCATION", "ORGANIZATION"}
@@ -77,7 +80,7 @@ def detect_with_presidio(text: str, language: str = "en") -> list[dict]:
     matches = []
     for result in results:
         detected_text = text[result.start:result.end]
-        if _is_generic_nlp_acronym_false_positive(result.entity_type, detected_text):
+        if _is_generic_nlp_false_positive(result.entity_type, detected_text):
             continue
 
         internal_type = ENTITY_TYPE_MAP.get(result.entity_type)
@@ -88,15 +91,22 @@ def detect_with_presidio(text: str, language: str = "en") -> list[dict]:
             "start": result.start,
             "end": result.end,
             "score": float(result.score),
-            "severity": SEVERITY_MAP.get(internal_type, "medium"),
+            "severity": severity_for(internal_type),
             "source": "presidio",
             "presidio_entity_type": result.entity_type,
         })
     return matches
 
 
-def _is_generic_nlp_acronym_false_positive(entity_type: str, detected_text: str) -> bool:
+def _is_generic_nlp_false_positive(entity_type: str, detected_text: str) -> bool:
     if entity_type not in _GENERIC_NLP_ENTITY_TYPES:
         return False
-    normalized = detected_text.strip().upper()
-    return normalized in _NLP_ACRONYM_FALSE_POSITIVES
+    normalized_upper = detected_text.strip().upper()
+    if normalized_upper in _NLP_ACRONYM_FALSE_POSITIVES:
+        return True
+    normalized_lower = " ".join(detected_text.strip().lower().split())
+    if entity_type in {"LOCATION", "ORGANIZATION"} and normalized_lower.startswith(("contactez ", "contacter ", "contact ")):
+        return True
+    if detected_text.strip() == normalized_lower:
+        return True
+    return normalized_lower in _NLP_SINGLE_TOKEN_FALSE_POSITIVES

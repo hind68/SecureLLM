@@ -27,6 +27,11 @@ _VALIDATORS = {
     "luhn": is_luhn_valid,
     "iban_checksum": is_iban_valid,
     "mixed_case": lambda v: any(c.isupper() for c in v) and any(c.islower() for c in v),
+    "generic_secret": lambda v: (
+        any(c.isupper() for c in v)
+        and any(c.islower() for c in v)
+        and not v.startswith("eyJ")
+    ),
 }
 
 _TYPE_ALIASES = {
@@ -34,6 +39,15 @@ _TYPE_ALIASES = {
     "cin_number": "moroccan_cin",
     "name": "person_name",
     "address": "location",
+}
+
+_TECHNICAL_SECRET_TYPES = {
+    "api_key",
+    "openai_api_key",
+    "github_token",
+    "jwt_token",
+    "bearer_token",
+    "private_key",
 }
 
 _rules_lock = threading.Lock()
@@ -139,7 +153,7 @@ def detect_credit_cards(text: str) -> list[dict]:
 
 
 def detect_api_keys(text: str) -> list[dict]:
-    return _run_rules(_rules_of_type("api_key"), text)
+    return _run_rules([r for r in _rules if r["type"] in _TECHNICAL_SECRET_TYPES], text)
 
 
 def run_regex_detectors(text: str) -> list[dict]:

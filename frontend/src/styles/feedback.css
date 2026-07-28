@@ -43,6 +43,11 @@
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.09);
   font-size: 14px;
   line-height: 1.35;
+  animation: toast-in 220ms ease-out both;
+}
+
+.inline-error.is-exiting {
+  animation: toast-out 200ms ease-out both;
 }
 
 .inline-error.success {
@@ -84,6 +89,57 @@
 .inline-error .close-icon::before,
 .inline-error .close-icon::after {
   width: 14px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(12px, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inline-error,
+  .inline-error.is-exiting {
+    animation-duration: 60ms;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes toast-out {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
 }
 
 

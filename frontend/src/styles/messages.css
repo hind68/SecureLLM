@@ -206,6 +206,7 @@
   background: #fff7f7;
   color: #8f1d1d;
   padding: 12px 14px;
+  animation: assistant-error-in 220ms ease-out both;
 }
 
 .assistant-error strong {
@@ -222,6 +223,34 @@
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+@keyframes assistant-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-error {
+    animation-duration: 60ms;
+  }
+
+  @keyframes assistant-error-in {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 

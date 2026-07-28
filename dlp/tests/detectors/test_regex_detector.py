@@ -57,7 +57,12 @@ def test_phone_not_falsely_flagged_as_credit_card():
 def test_detects_openai_style_key():
     text = "Here's my key: sk-test1234567890abcdefghijklmnop"
     matches = detect_api_keys(text)
-    assert any(m["value"] == "sk-test1234567890abcdefghijklmnop" for m in matches)
+    assert any(m["type"] == "openai_api_key" and m["value"] == "sk-test1234567890abcdefghijklmnop" for m in matches)
+
+def test_detects_openai_project_key_with_distinct_type():
+    text = "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"
+    matches = run_regex_detectors(text)
+    assert any(m["type"] == "openai_api_key" for m in matches)
 
 def test_detects_aws_style_key():
     text = "Access key: AKIAIOSFODNN7EXAMPLE"
@@ -69,6 +74,19 @@ def test_detects_two_keys_in_one_text():
     values = [m["value"] for m in detect_api_keys(text)]
     assert "sk-test1234567890abcdefghijklmnop" in values
     assert "AKIAIOSFODNN7EXAMPLE" in values
+
+def test_technical_secret_types_are_distinct():
+    text = (
+        "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz1234567890 "
+        "GitHub token ghp_abcdefghijklmnopqrstuvwxyz123456 "
+        "JWT eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue123456 "
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456"
+    )
+    types = {m["type"] for m in run_regex_detectors(text)}
+    assert "openai_api_key" in types
+    assert "github_token" in types
+    assert "jwt_token" in types
+    assert "bearer_token" in types
 
 def test_generic_pattern_ignores_lowercase_hex_hash():
     # A 32-char lowercase-only string (e.g. an MD5 digest) is exactly the
@@ -138,6 +156,25 @@ def test_detects_full_rib():
     text = "Voici le RIB complet: 230 810 5695021211005700 59 merci."
     matches = [m for m in run_regex_detectors(text) if m["type"] == "bank_account"]
     assert any(m["value"] == "230 810 5695021211005700 59" for m in matches)
+
+def test_detects_labeled_compact_rib_with_expected_length():
+    text = "Mon RIB est 007780000045678901234567."
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "bank_account"]
+    assert any(m["value"] == "007780000045678901234567" for m in matches)
+
+def test_compact_rib_requires_context():
+    text = "La reference 007780000045678901234567 est technique."
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "bank_account"]
+    assert matches == []
+
+def test_detects_private_key_headers_as_private_key():
+    for header in [
+        "-----BEGIN PRIVATE KEY-----",
+        "-----BEGIN RSA PRIVATE KEY-----",
+        "-----BEGIN OPENSSH PRIVATE KEY-----",
+    ]:
+        matches = [m for m in run_regex_detectors(header) if m["type"] == "private_key"]
+        assert matches
 
 def test_detects_valid_morocco_iban():
     text = "IBAN: MA64 2307 8094 3410 6211 0034 0090 pour le virement."

@@ -1,5 +1,5 @@
 def build_placeholder(match: dict) -> str:
-    return f"[{match['id'].upper()}_REDACTED]"
+    return f"[{match['id'].upper()}]"
 
 
 def mask_text(text: str, matches: list[dict]) -> str:
