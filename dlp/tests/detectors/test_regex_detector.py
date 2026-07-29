@@ -127,11 +127,18 @@ def test_detects_single_letter_cin_number():
     assert any(m["value"] == "A123456" for m in matches)
 
 def test_cin_lookalike_shapes_are_maskable_identifiers_without_context():
-    for value in ["A123456", "AB123456", "BE1234567", "GI22568"]:
+    for value in ["A123456", "AB123456", "BE1234567", "GI22568", "ac12345", "Ac12345", "aC12345"]:
         matches = [m for m in run_regex_detectors(value) if m["type"] == "alphanumeric_identifier"]
         assert len(matches) == 1
         assert matches[0]["value"] == value
         assert matches[0]["severity"] == "medium"
+
+def test_cin_detection_preserves_original_case_and_offsets():
+    text = "ma cin est ac12345"
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
+    assert len(matches) == 1
+    assert matches[0]["value"] == "ac12345"
+    assert text[matches[0]["start"]:matches[0]["end"]] == "ac12345"
 
 def test_detects_carte_nationale_cin_number():
     text = "Numero de carte nationale BE1234567"

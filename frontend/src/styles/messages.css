@@ -102,27 +102,39 @@
 
 /* Message actions and generation states */
 .code-block-header button,
-.message-actions button {
-  border: 0;
-  border-radius: 8px;
+.message-actions button,
+.dlp-alert-heading button,
+.dlp-detail-heading button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
   background: transparent;
-  color: inherit;
+  color: #6B7280;
   cursor: pointer;
-  display: inline-grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font: inherit;
+  padding: 0;
+  transition: all 0.2s ease;
 }
 
 .code-block-header button {
-  min-width: 32px;
-  height: 27px;
-  color: #ffffff;
-  font-size: 12px;
-  padding: 0 7px;
+  color: #D1D5DB;
 }
 
-.code-block-header button:hover {
-  background: rgba(255, 255, 255, 0.08);
+.code-block-header button:hover,
+.dlp-code-view .dlp-detail-heading button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #F9FAFB;
+}
+
+.message-actions button:hover,
+.dlp-alert-heading button:hover,
+.dlp-detail-heading button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #111827;
 }
 
 .message-actions {
@@ -144,16 +156,7 @@
 }
 
 .message-actions button {
-  height: 28px;
-  min-width: 28px;
-  color: #777777;
   font-size: 12px;
-  padding: 0 7px;
-}
-
-.message-actions button:hover {
-  background: #f5f5f5;
-  color: #202020;
 }
 
 .message.user .message-actions {
@@ -163,7 +166,7 @@
 }
 
 .message.user .message-actions button {
-  color: #5f5f5f;
+  color: #6B7280;
 }
 
 .copy-icon {
@@ -171,6 +174,15 @@
   height: 16px;
   display: block;
   object-fit: contain;
+  opacity: 0.7;
+}
+
+.check-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  object-fit: contain;
+  filter: grayscale(1) brightness(0.42);
   opacity: 0.7;
 }
 
@@ -223,6 +235,165 @@
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+.dlp-alert {
+  width: min(var(--assistant-content-width), 100%);
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #991B1B;
+  padding: 16px;
+  animation: assistant-error-in 220ms ease-out both;
+}
+
+.message.dlp-blocked-response {
+  margin-top: 8px;
+  margin-bottom: 28px;
+}
+
+.dlp-alert strong {
+  display: block;
+  color: #991B1B;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dlp-alert p {
+  margin: 4px 0 0;
+  color: #B91C1C;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.dlp-alert-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dlp-alert-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dlp-alert-icon {
+  width: 24px;
+  height: 24px;
+  color: #991B1B;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+
+.dlp-alert-heading button {
+  flex: 0 0 auto;
+}
+
+.dlp-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dlp-alert-actions button {
+  border: 1px solid #FCA5A5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #991B1B;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+}
+
+.dlp-alert-actions button:hover {
+  background-color: #FEE2E2;
+}
+
+.dlp-alert-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dlp-detail-panel {
+  margin-top: 12px;
+  animation: assistant-error-in 180ms ease-out both;
+}
+
+.dlp-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: #991B1B;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.dlp-code-view {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  background-color: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #E5E7EB;
+  padding: 12px;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.dlp-code-view code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dlp-code-view mark {
+  border-radius: 4px;
+  background-color: rgba(253, 224, 71, 0.15);
+  border: 1px solid rgba(253, 224, 71, 0.3);
+  color: #FDE047;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  padding: 2px 6px;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.dlp-detections {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dlp-detections li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+
+.dlp-detections small {
+  color: #9f3434;
+}
+
+.dlp-sensitive-warning {
+  margin-bottom: 8px !important;
+  color: #7f1d1d !important;
+  font-size: 13px !important;
+  font-weight: 620;
 }
 
 @keyframes assistant-error-in {

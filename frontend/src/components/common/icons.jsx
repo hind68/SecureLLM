@@ -20,3 +20,7 @@ export function CopyIcon({ tone = 'dark' }) {
   const src = tone === 'light' ? '/assets/white-copy.png' : '/assets/copy.png'
   return <img className="copy-icon" src={src} alt="" aria-hidden="true" />
 }
+
+export function CheckIcon() {
+  return <img className="check-icon" src="/assets/check.png" alt="" aria-hidden="true" />
+}

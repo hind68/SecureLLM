@@ -320,6 +320,82 @@ class ConversationServiceTest {
                 .contains(masked, "redonne-moi cette information");
     }
 
+    @Test
+    void streamMessageNeverSendsPreviouslyBlockedMessageToLiteLlm() {
+        Message blocked = new Message(conversation, RoleMessage.USER, 1, StatutMessage.DLP_BLOCKED, "", null);
+        blocked.blockByDlp("HIGH", "moroccan_cin");
+        Message allowed = new Message(conversation, RoleMessage.USER, 2, StatutMessage.TERMINE, "Message autorise", null);
+
+        List<LiteLlmMessage> payload = streamAndCaptureLiteLlmPayload(
+                List.of(blocked, allowed),
+                "Suite autorisee",
+                "Suite autorisee"
+        );
+
+        String joinedPayload = joinPayload(payload);
+        assertThat(joinedPayload)
+                .doesNotContain("Ma CIN")
+                .doesNotContain("moroccan_cin")
+                .doesNotContain("DLP_BLOCKED");
+        assertThat(payload)
+                .extracting(LiteLlmMessage::content)
+                .contains("Message autorise", "Suite autorisee");
+    }
+
+    @Test
+    void messagesExposePersistedDlpBlockedStateForHistoryReload() {
+        Message blocked = new Message(conversation, RoleMessage.USER, 1, StatutMessage.DLP_BLOCKED, "Ma CIN est [MOROCCAN_CIN_1]", null);
+        blocked.blockByDlp(
+                "HIGH",
+                "moroccan_cin,credit_card",
+                "moroccan_cin\t10\t18\t1\t[MOROCCAN_CIN_1]",
+                "Ma CIN est [MOROCCAN_CIN_1]"
+        );
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(messageRepository.findByConversationOrderByOrdreAsc(conversation)).thenReturn(List.of(blocked));
+
+        var messages = service.messages(10L);
+
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).status()).isEqualTo("DLP_BLOCKED");
+        assertThat(messages.get(0).dlpHighestSeverity()).isEqualTo("HIGH");
+        assertThat(messages.get(0).dlpDetectedTypes()).containsExactly("moroccan_cin", "credit_card");
+        assertThat(messages.get(0).content()).isEqualTo("Ma CIN est [MOROCCAN_CIN_1]");
+        assertThat(messages.get(0).dlpMaskedText()).isEqualTo("Ma CIN est [MOROCCAN_CIN_1]");
+        assertThat(messages.get(0).dlpMatches())
+                .extracting("type", "start", "end", "lineNumber", "placeholder")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("moroccan_cin", 10, 18, 1, "[MOROCCAN_CIN_1]"));
+    }
+
+    @Test
+    void streamMessagePersistsOriginalBlockedMessageMaskedTextAndPublicOffsetsOnly() {
+        conversation.rename("Nouvelle conversation");
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeTextForLlm("Ma CIN est AB123456", "demo-user"))
+                .thenThrow(new DlpBlockedException(
+                        "HIGH",
+                        Set.of("moroccan_cin"),
+                        "Ma CIN est [MOROCCAN_CIN_1]",
+                        List.of(new com.example.backend.integration.dlp.DlpPublicMatch("moroccan_cin", 10, 18, 1, "[MOROCCAN_CIN_1]"))
+                ));
+
+        service.streamMessage(10L, new SendMessageRequest("Ma CIN est AB123456"));
+
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.captor();
+        verify(messageRepository).save(messageCaptor.capture());
+        Message saved = messageCaptor.getValue();
+        assertThat(saved.getContenu()).isEqualTo("Ma CIN est [MOROCCAN_CIN_1]");
+        assertThat(saved.getDlpMaskedText()).isEqualTo("Ma CIN est [MOROCCAN_CIN_1]");
+        assertThat(saved.getDlpMatches())
+                .contains("moroccan_cin")
+                .contains("\t10\t18\t1\t")
+                .contains("[MOROCCAN_CIN_1]")
+                .doesNotContain("AB123456", "value", "rawValue");
+        assertThat(conversation.getTitre()).contains("[MOROCCAN_CIN_1]").doesNotContain("AB123456");
+    }
+
     @ParameterizedTest
     @CsvSource({
             "Le mot CIN peut designer une carte nationale sans numero.",
@@ -355,7 +431,7 @@ class ConversationServiceTest {
         service.streamMessage(10L, new SendMessageRequest(prompt));
 
         verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
-        verify(messageRepository, never()).save(any(Message.class));
+        assertBlockedMessageSaved(type);
     }
 
     @ParameterizedTest
@@ -390,6 +466,7 @@ class ConversationServiceTest {
         verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
         verify(messagePersistenceService, never()).completeAssistantMessage(any(), any());
         verify(messagePersistenceService, never()).failAssistantMessage(any(), any());
+        assertBlockedMessageSaved("moroccan_cin");
     }
 
     @Test
@@ -402,7 +479,7 @@ class ConversationServiceTest {
         service.streamMessage(10L, new SendMessageRequest("secret"));
 
         verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
-        verify(messageRepository, never()).save(any(Message.class));
+        assertBlockedMessageSaved("API_KEY");
     }
 
     @Test
@@ -487,7 +564,9 @@ class ConversationServiceTest {
         });
         when(messageRepository.findByConversationAndStatutAndRoleInOrderByOrdreAsc(eq(conversation), eq(StatutMessage.TERMINE), any()))
                 .thenAnswer(invocation -> {
-                    List<Message> messages = new java.util.ArrayList<>(previousMessages);
+                    List<Message> messages = previousMessages.stream()
+                            .filter(message -> message.getStatut() == StatutMessage.TERMINE)
+                            .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
                     if (savedUserMessage.get() != null) {
                         messages.add(savedUserMessage.get());
                     }
@@ -511,6 +590,17 @@ class ConversationServiceTest {
         return payload.stream()
                 .map(LiteLlmMessage::content)
                 .reduce("", (left, right) -> left + "\n" + right);
+    }
+
+    private void assertBlockedMessageSaved(String type) {
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.captor();
+        verify(messageRepository, times(1)).save(messageCaptor.capture());
+        Message saved = messageCaptor.getValue();
+        assertThat(saved.getRole()).isEqualTo(RoleMessage.USER);
+        assertThat(saved.getStatut()).isEqualTo(StatutMessage.DLP_BLOCKED);
+        assertThat(saved.getContenu()).doesNotContain("Ma CIN est AB123456");
+        assertThat(saved.getDlpHighestSeverity()).isEqualTo("HIGH");
+        assertThat(saved.getDlpDetectedTypes()).contains(type);
     }
 
     private static Stream<Arguments> historicalSensitiveMessages() {

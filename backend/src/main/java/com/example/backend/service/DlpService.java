@@ -6,8 +6,10 @@ import com.example.backend.integration.dlp.DlpClient;
 import com.example.backend.integration.dlp.DlpDecision;
 import com.example.backend.integration.dlp.DlpInvalidResponseException;
 import com.example.backend.integration.dlp.DlpMatch;
+import com.example.backend.integration.dlp.DlpPublicMatch;
 import com.example.backend.integration.dlp.DlpUnavailableException;
 import java.util.Set;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +34,12 @@ public class DlpService {
         validateResponse(response);
 
         if (response.decision() == DlpDecision.BLOCK) {
-            throw new DlpBlockedException(response.highestSeverity(), detectedTypes(response));
+            throw new DlpBlockedException(
+                    response.highestSeverity(),
+                    detectedTypes(response),
+                    response.maskedText(),
+                    publicMatches(text, response.matches())
+            );
         }
 
         if (response.maskedText() == null) {
@@ -59,5 +66,42 @@ public class DlpService {
                 .map(DlpMatch::type)
                 .filter(type -> type != null && !type.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private List<DlpPublicMatch> publicMatches(String text, List<DlpMatch> matches) {
+        if (matches == null || matches.isEmpty()) {
+            return List.of();
+        }
+        return matches.stream()
+                .map(match -> new DlpPublicMatch(
+                        match.type(),
+                        match.start(),
+                        match.end(),
+                        lineNumber(text, match.start()),
+                        placeholder(match)
+                ))
+                .toList();
+    }
+
+    private Integer lineNumber(String text, Integer start) {
+        if (text == null || start == null || start <= 0) {
+            return 1;
+        }
+        int boundedStart = Math.min(start, text.length());
+        int line = 1;
+        for (int i = 0; i < boundedStart; i++) {
+            if (text.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    private String placeholder(DlpMatch match) {
+        String id = match.id();
+        if (id == null || id.isBlank()) {
+            id = match.type() == null || match.type().isBlank() ? "DLP" : match.type();
+        }
+        return "[" + id.toUpperCase() + "]";
     }
 }

@@ -1,7 +1,9 @@
 package com.example.backend.controller;
 
 import com.example.backend.integration.dlp.DlpBlockedException;
+import com.example.backend.integration.dlp.DlpPublicMatch;
 import com.example.backend.integration.dlp.DlpUnavailableException;
+import java.util.List;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,7 +20,9 @@ public class ApiExceptionHandler {
                 "DLP_BLOCKED",
                 "Votre message contient une donnée sensible et ne peut pas être envoyé.",
                 exception.getDetectedTypes(),
-                exception.getHighestSeverity()
+                exception.getHighestSeverity(),
+                exception.getMaskedText(),
+                exception.getMatches()
         );
     }
 
@@ -27,9 +31,11 @@ public class ApiExceptionHandler {
     public ApiError handleDlpUnavailable() {
         return new ApiError(
                 "DLP_UNAVAILABLE",
-                "Le controle de securite est indisponible. Le message n'a pas ete envoye au modele.",
+                "Le contrôle de sécurité est indisponible. Le message n’a pas été envoyé au modèle.",
                 Set.of(),
-                null
+                null,
+                null,
+                List.of()
         );
     }
 
@@ -37,7 +43,9 @@ public class ApiExceptionHandler {
             String code,
             String message,
             Set<String> detectedTypes,
-            String highestSeverity
+            String highestSeverity,
+            String maskedText,
+            List<DlpPublicMatch> matches
     ) {
     }
 }

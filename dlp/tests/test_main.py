@@ -117,6 +117,33 @@ def test_moroccan_cin_ticket_and_build_references_are_masked_not_cin(monkeypatch
     assert any(match["type"] == "alphanumeric_identifier" for match in ticket["matches"])
     assert any(match["type"] == "alphanumeric_identifier" for match in build["matches"])
 
+@pytest.mark.parametrize(
+    ("text", "decision", "expected_type"),
+    [
+        ("ma cin est ac12345", "BLOCK", "moroccan_cin"),
+        ("Ma CIN est AC12345", "BLOCK", "moroccan_cin"),
+        ("My national ID is Ac12345", "BLOCK", "moroccan_cin"),
+        ("Ticket ac12345", "MASK", "alphanumeric_identifier"),
+        ("ac12345", "MASK", "alphanumeric_identifier"),
+    ],
+)
+def test_moroccan_cin_detection_is_case_insensitive(monkeypatch, text, decision, expected_type):
+    _disable_presidio(monkeypatch)
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == decision
+    assert any(match["type"] == expected_type for match in data["matches"])
+    if expected_type == "moroccan_cin":
+        assert data["highest_severity"] == "high"
+        assert not any(match["type"] == "alphanumeric_identifier" for match in data["matches"])
+    else:
+        assert not any(match["type"] == "moroccan_cin" for match in data["matches"])
+    if " " in text:
+        assert data["masked_text"].startswith(text.split()[0])
+    else:
+        assert data["masked_text"].startswith("[")
+
 
 def test_multilingual_cin_context_blocks(monkeypatch):
     _disable_presidio(monkeypatch)
@@ -210,6 +237,34 @@ def test_technical_secret_types_are_distinct_in_analyse(monkeypatch):
 
     assert data["decision"] == "BLOCK"
     assert {"openai_api_key", "github_token", "jwt_token", "bearer_token"}.issubset(types)
+
+
+def test_openai_project_key_is_fully_masked_without_prefix_leak(monkeypatch):
+    _disable_presidio(monkeypatch)
+    text = "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == "BLOCK"
+    assert data["masked_text"] == "OPENAI_API_KEY=[API_KEY_1]"
+    assert "sk-proj-" not in data["masked_text"]
+    assert "]]" not in data["masked_text"]
+    assert any(match["type"] == "openai_api_key" for match in data["matches"])
+
+
+def test_two_openai_keys_get_coherent_indices(monkeypatch):
+    _disable_presidio(monkeypatch)
+    text = (
+        "first sk-proj-abcdefghijklmnopqrstuvwxyz1234567890 "
+        "second sk-abcdefghijklmnopqrstuvwxyz123456"
+    )
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert "[API_KEY_1]" in data["masked_text"]
+    assert "[API_KEY_2]" in data["masked_text"]
+    assert data["masked_text"].index("[API_KEY_1]") < data["masked_text"].index("[API_KEY_2]")
+    assert "sk-proj-" not in data["masked_text"]
 
 
 def test_ip_policy_currently_blocks_and_is_documented(monkeypatch):

@@ -24,3 +24,21 @@ def test_mask_multiple_matches_no_offset_corruption():
 def test_mask_no_matches_returns_original():
     text = "Nothing sensitive here."
     assert mask_text(text, []) == text
+
+
+def test_openai_api_key_placeholder_uses_generic_api_key_label():
+    match = {"id": "openai_api_key_1", "type": "openai_api_key"}
+    assert build_placeholder(match) == "[API_KEY_1]"
+
+
+def test_masking_replaces_from_end_without_extra_brackets():
+    text = "A [LOCATION_2] B sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"
+    matches = [
+        {"id": "location_1", "type": "location", "start": 2, "end": 14},
+        {"id": "openai_api_key_1", "type": "openai_api_key", "start": 17, "end": len(text)},
+    ]
+
+    masked = mask_text(text, matches)
+
+    assert masked == "A [LOCATION_1] B [API_KEY_1]"
+    assert "]]" not in masked

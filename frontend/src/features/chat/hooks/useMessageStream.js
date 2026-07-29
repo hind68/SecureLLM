@@ -81,13 +81,33 @@ export default function useMessageStream({
     }
 
     if (event === 'error') {
-      const message = dlpUserMessage(jsonData) || friendlyGenerationError(jsonData)
-      updateConversationMessages(conversationId, (current) =>
-        current.map((item) =>
+      const parsed = parseJson(jsonData)
+      const message = dlpUserMessage(parsed || jsonData) || friendlyGenerationError(jsonData)
+      updateConversationMessages(conversationId, (current) => {
+        if (parsed?.code === 'DLP_BLOCKED') {
+          return current
+            .map((item) =>
+                  item.id === localUserId
+                ? {
+                    ...item,
+                    status: 'DLP_BLOCKED',
+                    dlpOriginalText: item.content,
+                    dlpMaskedText: parsed.maskedText || '',
+                    dlpHighestSeverity: parsed.highestSeverity,
+                    dlpDetectedTypes: parsed.detectedTypes || [],
+                    dlpMatches: parsed.matches || [],
+                  }
+                : item,
+            )
+            .filter((item) => item.id !== localAssistantId)
+        }
+        return current.map((item) =>
           item.id === localAssistantId ? { ...item, status: 'ECHEC', content: item.content || message } : item,
-        ),
-      )
-      if (activeConversationIdRef.current === conversationId) showError(message)
+        )
+      })
+      if (activeConversationIdRef.current === conversationId && parsed?.code !== 'DLP_BLOCKED') {
+        showError(message)
+      }
     }
   }, [activeConversationIdRef, appendToken, showError, updateConversationMessages])
 

@@ -142,13 +142,13 @@
       "type": "cin_number",
       "severity": "high",
       "capture_group": 1,
-      "pattern": "(?:\\b(?i:CIN|C\\.I\\.N|CNIE|Carte Nationale(?: d[\\x27\\u2019]?Identit[eé])?|Carte(?: d[\\x27\\u2019])?Identit[eé]|Num[eé]ro d[\\x27\\u2019]?Identit[eé]|Identit[eé] Nationale|National ID|Identity Card|ID Card|National Identity|N[o°]?\\s*CIN)\\b|البطاقة الوطنية|بطاقة التعريف|رقم البطاقة|رقم التعريف الوطني).{0,80}?\\b([A-Z]{1,2}\\d{5,8})\\b"
+      "pattern": "(?:\\b(?i:CIN|C\\.I\\.N|CNIE|Carte Nationale(?: d[\\x27\\u2019]?Identit[eé])?|Carte(?: d[\\x27\\u2019])?Identit[eé]|Num[eé]ro d[\\x27\\u2019]?Identit[eé]|Identit[eé] Nationale|National ID|Identity Card|ID Card|National Identity|N[o°]?\\s*CIN)\\b|البطاقة الوطنية|بطاقة التعريف|رقم البطاقة|رقم التعريف الوطني).{0,80}?\\b([A-Za-z]{1,2}\\d{5,8})\\b"
     },
     {
       "name": "alphanumeric_identifier_lookalike",
       "type": "alphanumeric_identifier",
       "severity": "medium",
-      "pattern": "(?<![A-Za-z0-9])[A-Z]{1,2}\\d{5,8}(?![A-Za-z0-9])"
+      "pattern": "(?<![A-Za-z0-9])[A-Za-z]{1,2}\\d{5,8}(?![A-Za-z0-9])"
     },
     {
       "name": "civil_registry_number_labeled",

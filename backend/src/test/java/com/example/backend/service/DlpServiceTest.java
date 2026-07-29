@@ -49,10 +49,10 @@ class DlpServiceTest {
 
     @Test
     void blockThrowsBeforeAnyCallerCanReachLlm() {
-        DlpMatch match = new DlpMatch("1", "moroccan_cin", 0, 3, "HIGH", "regex", 1.0, null);
-        DlpMatch duplicateMatch = new DlpMatch("2", "moroccan_cin", 5, 8, "HIGH", "regex", 1.0, null);
+        DlpMatch match = new DlpMatch("moroccan_cin_1", "moroccan_cin", 0, 3, "HIGH", "regex", 1.0, null);
+        DlpMatch duplicateMatch = new DlpMatch("moroccan_cin_2", "moroccan_cin", 5, 8, "HIGH", "regex", 1.0, null);
         when(dlpClient.analyse("key abc", "demo-user"))
-                .thenReturn(response(DlpDecision.BLOCK, null, List.of(match, duplicateMatch)));
+                .thenReturn(response(DlpDecision.BLOCK, "key [MOROCCAN_CIN_1]", List.of(match, duplicateMatch)));
 
         assertThatThrownBy(() -> dlpService.safeTextForLlm("key abc", "demo-user"))
                 .isInstanceOf(DlpBlockedException.class)
@@ -60,6 +60,13 @@ class DlpServiceTest {
                     DlpBlockedException blocked = (DlpBlockedException) exception;
                     assertThat(blocked.getHighestSeverity()).isEqualTo("HIGH");
                     assertThat(blocked.getDetectedTypes()).containsExactly("moroccan_cin");
+                    assertThat(blocked.getMaskedText()).isEqualTo("key [MOROCCAN_CIN_1]");
+                    assertThat(blocked.getMatches())
+                            .extracting("type", "start", "end", "lineNumber", "placeholder")
+                            .contains(
+                                    org.assertj.core.groups.Tuple.tuple("moroccan_cin", 0, 3, 1, "[MOROCCAN_CIN_1]"),
+                                    org.assertj.core.groups.Tuple.tuple("moroccan_cin", 5, 8, 1, "[MOROCCAN_CIN_2]")
+                            );
                 });
     }
 

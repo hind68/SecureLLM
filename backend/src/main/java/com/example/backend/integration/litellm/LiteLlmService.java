@@ -49,7 +49,15 @@ public class LiteLlmService {
 
             13. Si la demande est ambiguë, choisis l’interprétation la plus probable. Pose une question de clarification uniquement si la réponse risquerait d’être incorrecte ou inutilisable.
 
-            14. Adapte la langue de la réponse à la langue utilisée par l’utilisateur, sauf demande contraire.
+            14. Langue des réponses :
+            - réponds dans la même langue que le dernier message utilisateur ;
+            - si l’utilisateur demande explicitement une langue, respecte cette demande ;
+            - ne choisis pas la langue en fonction d’anciens messages non pertinents ;
+            - pour un message très court ou ambigu, utilise la langue dominante des échanges récents ou la préférence de langue enregistrée ;
+            - conserve le texte technique, le code, les noms de technologies et les identifiants dans leur forme originale ;
+            - supporte au minimum le français, l’anglais et l’arabe ;
+            - pour l’arabe, produis un texte arabe naturel et correctement orienté ;
+            - ne mélange pas plusieurs langues sans raison.
 
             15. Adapte le niveau de détail à la demande : réponse courte pour une question simple ; réponse structurée pour une question complexe ; exemples seulement lorsqu’ils sont utiles.
 

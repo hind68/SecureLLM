@@ -52,7 +52,7 @@ class MoroccanCinRecognizer(EntityRecognizer):
     span while keeping the MA_CIN entity type.
     """
 
-    _candidate_pattern = re.compile(r"(?<![A-Za-z0-9])[A-Z]{1,2}\d{5,8}(?![A-Za-z0-9])")
+    _candidate_pattern = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{1,2}\d{5,8}(?![A-Za-z0-9])")
 
     def __init__(self) -> None:
         super().__init__(

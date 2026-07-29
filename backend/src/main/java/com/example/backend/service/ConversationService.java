@@ -16,6 +16,7 @@ import com.example.backend.enums.StatutMessage;
 import com.example.backend.enums.StatutModeleLlm;
 import com.example.backend.integration.dlp.DlpAnalysisException;
 import com.example.backend.integration.dlp.DlpBlockedException;
+import com.example.backend.integration.dlp.DlpPublicMatch;
 import com.example.backend.integration.dlp.DlpUnavailableException;
 import com.example.backend.integration.litellm.LiteLlmMessage;
 import com.example.backend.integration.litellm.LiteLlmService;
@@ -27,8 +28,11 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -178,7 +182,13 @@ public class ConversationService {
         }
 
         ModeleLlm generationModel = conversation.getModele();
-        String safeContent = dlpService.safeTextForLlm(content, conversation.getUtilisateur().getExternalId());
+        String safeContent;
+        try {
+            safeContent = dlpService.safeTextForLlm(content, conversation.getUtilisateur().getExternalId());
+        } catch (DlpBlockedException exception) {
+            persistBlockedUserMessage(conversation, content, exception);
+            throw exception;
+        }
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
         Message userMessage = messageRepository.save(new Message(
                 conversation,
@@ -319,9 +329,117 @@ public class ConversationService {
                 responseToId,
                 modelAlias,
                 modelDisplayName,
+                message.getDlpHighestSeverity(),
+                parseDetectedTypes(message.getDlpDetectedTypes()),
+                parseDlpMatches(message.getDlpMatches()),
+                message.getDlpMaskedText(),
                 message.getCreatedAt(),
                 message.getUpdatedAt()
         );
+    }
+
+    private void persistBlockedUserMessage(Conversation conversation, String content, DlpBlockedException exception) {
+        int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
+        String maskedText = exception.getMaskedText() == null ? "" : exception.getMaskedText();
+        Message userMessage = new Message(
+                conversation,
+                RoleMessage.USER,
+                nextOrder,
+                StatutMessage.DLP_BLOCKED,
+                maskedText,
+                null
+        );
+        userMessage.blockByDlp(
+                exception.getHighestSeverity(),
+                serializeDetectedTypes(exception.getDetectedTypes()),
+                serializeDlpMatches(exception.getMatches()),
+                maskedText
+        );
+        messageRepository.save(userMessage);
+        if ("Nouvelle conversation".equals(conversation.getTitre())) {
+            conversation.rename(titleFromMasked(maskedText));
+        }
+        conversation.touchLastMessageAt(Instant.now());
+    }
+
+    private String serializeDetectedTypes(Set<String> detectedTypes) {
+        if (detectedTypes == null || detectedTypes.isEmpty()) {
+            return "";
+        }
+        return detectedTypes.stream()
+                .filter(type -> type != null && !type.isBlank())
+                .sorted(Comparator.naturalOrder())
+                .collect(Collectors.joining(","));
+    }
+
+    private List<String> parseDetectedTypes(String detectedTypes) {
+        if (detectedTypes == null || detectedTypes.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(detectedTypes.split(","))
+                .map(String::trim)
+                .filter(type -> !type.isBlank())
+                .toList();
+    }
+
+    private String serializeDlpMatches(List<DlpPublicMatch> matches) {
+        if (matches == null || matches.isEmpty()) {
+            return "";
+        }
+        return matches.stream()
+                .map(match -> encodeMatchField(match.type()) + "\t"
+                        + valueOrEmpty(match.start()) + "\t"
+                        + valueOrEmpty(match.end()) + "\t"
+                        + valueOrEmpty(match.lineNumber()) + "\t"
+                        + encodeMatchField(match.placeholder()))
+                .collect(Collectors.joining("\n"));
+    }
+
+    private List<DlpPublicMatch> parseDlpMatches(String matches) {
+        if (matches == null || matches.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(matches.split("\\R"))
+                .map(this::parseDlpMatch)
+                .filter(match -> match != null)
+                .toList();
+    }
+
+    private DlpPublicMatch parseDlpMatch(String line) {
+        String[] parts = line.split("\\t", -1);
+        if (parts.length != 5) {
+            return null;
+        }
+        return new DlpPublicMatch(
+                decodeMatchField(parts[0]),
+                parseInteger(parts[1]),
+                parseInteger(parts[2]),
+                parseInteger(parts[3]),
+                decodeMatchField(parts[4])
+        );
+    }
+
+    private String encodeMatchField(String value) {
+        return value == null ? "" : value.replace("%", "%25").replace("\t", "%09").replace("\n", "%0A").replace("\r", "%0D");
+    }
+
+    private String decodeMatchField(String value) {
+        return value.replace("%0D", "\r").replace("%0A", "\n").replace("%09", "\t").replace("%25", "%");
+    }
+
+    private String valueOrEmpty(Integer value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private Integer parseInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private void trySend(SseEmitter emitter, String event, Object value) {
@@ -338,22 +456,28 @@ public class ConversationService {
                     "DLP_BLOCKED",
                     "Votre message contient une donnée sensible et ne peut pas être envoyé.",
                     blockedException.getDetectedTypes(),
-                    blockedException.getHighestSeverity()
+                    blockedException.getHighestSeverity(),
+                    blockedException.getMaskedText(),
+                    blockedException.getMatches()
             );
         }
         if (exception instanceof DlpUnavailableException) {
             return new StreamErrorResponse(
                     "DLP_UNAVAILABLE",
-                    "Le controle de securite est indisponible. Le message n'a pas ete envoye au modele.",
+                    "Le contrôle de sécurité est indisponible. Le message n’a pas été envoyé au modèle.",
                     Set.of(),
-                    null
+                    null,
+                    null,
+                    List.of()
             );
         }
         return new StreamErrorResponse(
                 "DLP_ERROR",
-                "Le controle de securite n'a pas pu analyser le message. Le message n'a pas ete envoye au modele.",
+                "Le contrôle de sécurité n’a pas pu analyser le message. Le message n’a pas été envoyé au modèle.",
                 Set.of(),
-                null
+                null,
+                null,
+                List.of()
         );
     }
 
@@ -384,6 +508,15 @@ public class ConversationService {
         return "Discussion: " + compact.substring(0, 45) + "...";
     }
 
+    private String titleFromMasked(String content) {
+        String compact = content == null ? "" : content.replaceAll("\\s+", " ").trim();
+        if (compact.isBlank()) {
+            return "Discussion bloquée";
+        }
+        String title = "Discussion: " + compact;
+        return title.length() <= 160 ? title : title.substring(0, 157) + "...";
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -412,7 +545,9 @@ public class ConversationService {
             String code,
             String message,
             Set<String> detectedTypes,
-            String highestSeverity
+            String highestSeverity,
+            String maskedText,
+            List<DlpPublicMatch> matches
     ) {
     }
 }
