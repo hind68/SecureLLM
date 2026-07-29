@@ -1,6 +1,7 @@
 package com.example.backend.integration.dlp;
 
 import io.netty.channel.ChannelOption;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -11,6 +12,8 @@ import reactor.netty.http.client.HttpClient;
 
 @Component
 public class DlpClient {
+
+    private static final MediaType APPLICATION_JSON_UTF8 = new MediaType("application", "json", StandardCharsets.UTF_8);
 
     private final WebClient webClient;
     private final Duration readTimeout;
@@ -39,7 +42,8 @@ public class DlpClient {
         try {
             return webClient.post()
                     .uri("/analyse")
-                    .contentType(MediaType.APPLICATION_JSON)
+                    .contentType(APPLICATION_JSON_UTF8)
+                    .accept(APPLICATION_JSON_UTF8)
                     .bodyValue(new DlpAnalysisRequest(text, userId))
                     .retrieve()
                     .onStatus(

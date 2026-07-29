@@ -21,18 +21,19 @@ export default function ChatComposer({
     >
       <textarea
         ref={textareaRef}
-        disabled={isGenerating}
+        aria-disabled={isGenerating}
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder="Poser une question"
+        readOnly={isGenerating}
         rows={1}
         value={draft}
       />
       <button
         className={isGenerating ? 'stop-button' : ''}
         type={isGenerating ? 'button' : 'submit'}
-        aria-label={isGenerating ? 'Interrompre la generation' : 'Envoyer'}
-        title={isGenerating ? 'Interrompre la generation' : 'Envoyer'}
+        aria-label={isGenerating ? 'Interrompre la génération' : 'Envoyer'}
+        title={isGenerating ? 'Interrompre la génération' : 'Envoyer'}
         disabled={!isGenerating && !canSend}
         onClick={isGenerating ? onStop : undefined}
       >

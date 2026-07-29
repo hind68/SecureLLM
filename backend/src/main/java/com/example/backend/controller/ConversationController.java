@@ -89,7 +89,7 @@ public class ConversationController {
         return conversationService.messages(id);
     }
 
-    @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
     public SseEmitter streamConversationMessage(
             @PathVariable Long id,
             @Valid @RequestBody SendMessageRequest request

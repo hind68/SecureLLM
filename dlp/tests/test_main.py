@@ -2,6 +2,7 @@ import io
 import logging
 import zipfile
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main
@@ -57,7 +58,22 @@ def test_moroccan_cin_requires_context(monkeypatch):
     assert any(match["type"] == "moroccan_cin" for match in positive.json()["matches"])
 
     negative = client.post("/analyse", json={"text": "La reference du ticket est AB123456."})
-    assert negative.json()["decision"] == "ALLOW"
+    negative_data = negative.json()
+    assert negative_data["decision"] == "MASK"
+    assert any(match["type"] == "alphanumeric_identifier" for match in negative_data["matches"])
+    assert not any(match["type"] == "moroccan_cin" for match in negative_data["matches"])
+
+
+def test_cin_lookalike_shapes_are_masked_as_distinct_identifier(monkeypatch):
+    _disable_presidio(monkeypatch)
+
+    for value in ["A123456", "AB123456", "BE1234567", "GI22568"]:
+        data = client.post("/analyse", json={"text": value}).json()
+        assert data["decision"] == "MASK"
+        assert data["highest_severity"] == "medium"
+        assert any(match["type"] == "alphanumeric_identifier" for match in data["matches"])
+        assert not any(match["type"] == "moroccan_cin" for match in data["matches"])
+        assert value not in data["masked_text"]
 
 
 def test_moroccan_cin_exact_text_blocks_and_masks(monkeypatch):
@@ -88,14 +104,33 @@ def test_moroccan_cin_carte_nationale_blocks(monkeypatch):
     assert any(match["type"] == "moroccan_cin" for match in data["matches"])
 
 
-def test_moroccan_cin_ticket_and_build_references_are_allowed(monkeypatch):
+def test_moroccan_cin_ticket_and_build_references_are_masked_not_cin(monkeypatch):
     _disable_presidio(monkeypatch)
 
     ticket = client.post("/analyse", json={"text": "La reference du ticket est AB123456."}).json()
     build = client.post("/analyse", json={"text": "Le build AB123456 a echoue."}).json()
 
+    assert ticket["decision"] == "MASK"
+    assert build["decision"] == "MASK"
     assert not any(match["type"] == "moroccan_cin" for match in ticket["matches"])
     assert not any(match["type"] == "moroccan_cin" for match in build["matches"])
+    assert any(match["type"] == "alphanumeric_identifier" for match in ticket["matches"])
+    assert any(match["type"] == "alphanumeric_identifier" for match in build["matches"])
+
+
+def test_multilingual_cin_context_blocks(monkeypatch):
+    _disable_presidio(monkeypatch)
+
+    examples = [
+        "Ma CIN est GI22568",
+        "My national ID is AB123456",
+        "رقم البطاقة الوطنية هو AB123456",
+    ]
+
+    for text in examples:
+        data = client.post("/analyse", json={"text": text}).json()
+        assert data["decision"] == "BLOCK"
+        assert any(match["type"] == "moroccan_cin" for match in data["matches"])
 
 
 def test_validators_for_iban_and_credit_card(monkeypatch):
@@ -205,6 +240,64 @@ def test_arabic_text_uses_regex_without_french_nlp(monkeypatch):
     data = client.post("/analyse", json={"text": "مرحبا client@example.com"}).json()
     assert data["decision"] == "MASK"
     assert calls == ["ar"]
+
+
+def test_utf8_text_round_trips_without_mojibake(monkeypatch):
+    _disable_presidio(monkeypatch)
+
+    examples = [
+        "Ma clé API",
+        "Mon numéro de téléphone",
+        "La référence est AB123456",
+        "البريد الإلكتروني هو client@example.com",
+    ]
+
+    for text in examples:
+        data = client.post("/analyse", json={"text": text}).json()
+        serialized = str(data)
+        assert "clÃ©" not in serialized
+        assert "numÃ©ro" not in serialized
+        assert "rÃ©fÃ©rence" not in serialized
+        if data["masked_text"] == text:
+            assert data["masked_text"] == text
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_type", "decision"),
+    [
+        ("Mon email est client@example.com", "email", "MASK"),
+        ("My email is client@example.com", "email", "MASK"),
+        ("البريد الإلكتروني هو client@example.com", "email", "MASK"),
+        ("Mon téléphone est 0612345678", "phone_number", "MASK"),
+        ("My Moroccan phone is +212612345678", "phone_number", "MASK"),
+        ("رقم الهاتف هو 0612345678", "phone_number", "MASK"),
+        ("Ma CIN est GI22568", "moroccan_cin", "BLOCK"),
+        ("My national ID is AB123456", "moroccan_cin", "BLOCK"),
+        ("رقم البطاقة الوطنية هو AB123456", "moroccan_cin", "BLOCK"),
+        ("Mon IBAN est MA64 2307 8094 3410 6211 0034 0090", "iban", "BLOCK"),
+        ("My IBAN is MA64 2307 8094 3410 6211 0034 0090", "iban", "BLOCK"),
+        ("رقم IBAN هو MA64 2307 8094 3410 6211 0034 0090", "iban", "BLOCK"),
+        ("Mon RIB est 007780000045678901234567", "bank_account", "BLOCK"),
+        ("My bank account RIB is 007780000045678901234567", "bank_account", "BLOCK"),
+        ("رقم RIB هو 007780000045678901234567", "bank_account", "BLOCK"),
+        ("Ma carte bancaire est 4111 1111 1111 1111", "credit_card", "BLOCK"),
+        ("My card is 4111 1111 1111 1111", "credit_card", "BLOCK"),
+        ("رقم البطاقة البنكية هو 4111 1111 1111 1111", "credit_card", "BLOCK"),
+        ("Adresse IP 192.168.1.24", "ip_address", "BLOCK"),
+        ("IP address 192.168.1.24", "ip_address", "BLOCK"),
+        ("عنوان IP هو 192.168.1.24", "ip_address", "BLOCK"),
+        ("Ma clé API est sk-abcdefghijklmnopqrstuvwxyz123456", "openai_api_key", "BLOCK"),
+        ("My API key is sk-abcdefghijklmnopqrstuvwxyz123456", "openai_api_key", "BLOCK"),
+        ("مفتاح API هو sk-abcdefghijklmnopqrstuvwxyz123456", "openai_api_key", "BLOCK"),
+    ],
+)
+def test_structured_dlp_coverage_fr_en_ar(monkeypatch, text, expected_type, decision):
+    _disable_presidio(monkeypatch)
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == decision
+    assert any(match["type"] == expected_type for match in data["matches"])
 
 
 def test_txt_file(monkeypatch):

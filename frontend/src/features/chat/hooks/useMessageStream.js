@@ -15,6 +15,7 @@ export default function useMessageStream({
   activeConversationIdRef,
   loadConversations,
   modelDisplayName,
+  onStreamSettled,
   setConversationUiStatus,
   setMessages,
   showError,
@@ -164,6 +165,7 @@ export default function useMessageStream({
       if (generationAbortRef.current === abortController) {
         generationAbortRef.current = null
       }
+      onStreamSettled?.()
     }
   }, [
     activeConversationIdRef,
@@ -172,6 +174,7 @@ export default function useMessageStream({
     loadConversations,
     modelDisplayName,
     nextLocalId,
+    onStreamSettled,
     setConversationUiStatus,
     showError,
     updateConversationMessages,

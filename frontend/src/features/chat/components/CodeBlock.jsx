@@ -18,7 +18,7 @@ export default function CodeBlock({ code, copiedKey, language, onCopy, setCopied
       <div className="code-block-header">
         <span>{formatLanguageName(detectedLanguage)}</span>
         <button type="button" aria-label="Copier le code" onClick={copyCode}>
-          {copiedKey === copyKey ? 'Copie' : <CopyIcon tone="light" />}
+          {copiedKey === copyKey ? 'Copié' : <CopyIcon tone="light" />}
         </button>
       </div>
       <SyntaxHighlighter

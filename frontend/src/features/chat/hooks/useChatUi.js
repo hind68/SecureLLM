@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import useAutoScroll from './useAutoScroll'
 import useMessageStream from './useMessageStream'
 import { logDevelopmentError } from '../../../utils/errors'
+import { focusTextareaOnNextFrame, shouldFocusComposer } from '../utils/composerFocus'
 
 /**
  * Groups the chat surface state that is independent from conversation CRUD.
@@ -30,6 +31,7 @@ export default function useChatUi({
   const composerRef = useRef(null)
   const composerBeforeRectRef = useRef(null)
   const composerTimerRef = useRef(null)
+  const shouldRestoreComposerFocusRef = useRef(false)
 
   const hasActiveMessages = messages.length > 0
   const canSend = Boolean(activeModelAlias && draft.trim() && !isGenerating)
@@ -51,6 +53,17 @@ export default function useChatUi({
     activeConversationIdRef,
     loadConversations,
     modelDisplayName,
+    onStreamSettled: () => {
+      if (!shouldRestoreComposerFocusRef.current) return
+      if (!shouldFocusComposer({
+        activeElement: document.activeElement,
+        composer: composerRef.current,
+        textarea: textareaRef.current,
+      })) {
+        return
+      }
+      focusTextareaOnNextFrame(textareaRef.current)
+    },
     setConversationUiStatus,
     setMessages,
     showError,
@@ -105,6 +118,30 @@ export default function useChatUi({
     }
   }, [])
 
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!shouldRestoreComposerFocusRef.current) return
+      if (composerRef.current?.contains(event.target)) return
+      shouldRestoreComposerFocusRef.current = false
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true)
+  }, [])
+
+  const rememberComposerFocusIntent = useCallback(() => {
+    shouldRestoreComposerFocusRef.current = shouldFocusComposer({
+      activeElement: document.activeElement,
+      composer: composerRef.current,
+      textarea: textareaRef.current,
+    })
+  }, [])
+
+  const restoreComposerFocusSoon = useCallback(() => {
+    if (!shouldRestoreComposerFocusRef.current) return
+    focusTextareaOnNextFrame(textareaRef.current)
+  }, [])
+
   const handleKeyDown = useCallback((event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -148,6 +185,8 @@ export default function useChatUi({
     setIsLastBlockVisible,
     setMessages,
     shouldAutoScrollRef,
+    rememberComposerFocusIntent,
+    restoreComposerFocusSoon,
     stopGeneration,
     streamMessage,
     textareaRef,

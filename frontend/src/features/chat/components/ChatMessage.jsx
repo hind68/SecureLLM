@@ -31,7 +31,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
         ) : isWaiting ? (
           <TypingIndicator />
         ) : isFailed ? (
-          <ErrorMessage content={message.content || 'La generation a echoue.'} />
+          <ErrorMessage content={message.content || 'La génération a échoué.'} />
         ) : (
           <>
             <MarkdownContent
@@ -43,8 +43,8 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
             />
             {message.content && (
               <div className="message-actions">
-                <button type="button" aria-label="Copier la reponse" onClick={copyResponse}>
-                  {copiedKey === messageCopyKey ? <span>Copie</span> : <CopyIcon />}
+                <button type="button" aria-label="Copier la réponse" onClick={copyResponse}>
+                  {copiedKey === messageCopyKey ? <span>Copié</span> : <CopyIcon />}
                 </button>
               </div>
             )}
@@ -54,7 +54,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
       {isUser && message.content && (
         <div className="message-actions user-actions">
           <button type="button" aria-label="Copier mon prompt" onClick={() => copyResponse(promptCopyKey)}>
-            {copiedKey === promptCopyKey ? <span>Copie</span> : <CopyIcon />}
+            {copiedKey === promptCopyKey ? <span>Copié</span> : <CopyIcon />}
           </button>
         </div>
       )}
@@ -78,7 +78,7 @@ function AssistantMessageHeader({ modelAlias, modelName }) {
 function ErrorMessage({ content }) {
   return (
     <div className="assistant-error" role="alert">
-      <strong>Impossible de generer la reponse</strong>
+      <strong>Impossible de générer la réponse</strong>
       <p>{content}</p>
     </div>
   )
@@ -86,7 +86,7 @@ function ErrorMessage({ content }) {
 
 function TypingIndicator() {
   return (
-    <div className="typing-indicator" aria-label="Reponse en cours">
+    <div className="typing-indicator" aria-label="Réponse en cours">
       <span></span>
       <span></span>
       <span></span>

@@ -99,7 +99,7 @@ export default function AppLayout({
               <ConversationMenu
                 id="header-conversation-menu"
                 isOpen={layout.isHeaderMenuOpen}
-                archiveLabel={activeConversation.status === 'ARCHIVEE' ? 'Desarchiver' : 'Archiver'}
+                archiveLabel={activeConversation.status === 'ARCHIVEE' ? 'Désarchiver' : 'Archiver'}
                 onArchive={() => (activeConversation.status === 'ARCHIVEE' ? actions.restoreConversation(activeConversation) : actions.archiveConversation(activeConversation))}
                 onDelete={() => actions.deleteConversation(activeConversation)}
                 onOpen={() => {
@@ -162,7 +162,7 @@ export default function AppLayout({
       {dialogs.modelDecision && (
         <div className="decision-backdrop" role="presentation">
           <div className="decision-box" role="dialog" aria-modal="true" aria-labelledby="model-decision-title">
-            <h2 id="model-decision-title">Changer de modele ?</h2>
+            <h2 id="model-decision-title">Changer de modèle ?</h2>
             <p>Cette conversation utilise actuellement {models.modelDisplayName(activeConversation?.modelAlias)}. Que souhaitez-vous faire avec {models.modelDisplayName(dialogs.modelDecision.alias)} ?</p>
             <div className="decision-actions">
               <button type="button" onClick={() => actions.openNewConversationWithModel(dialogs.modelDecision.alias)}>
@@ -182,7 +182,7 @@ export default function AppLayout({
       {dialogs.pendingDeleteConversation && (
         <ConfirmDialog
           title="Supprimer la conversation ?"
-          message={`La conversation "${displayConversationTitle(dialogs.pendingDeleteConversation.title)}" sera supprimee definitivement.`}
+          message={`La conversation "${displayConversationTitle(dialogs.pendingDeleteConversation.title)}" sera supprimée définitivement.`}
           confirmLabel="Confirmer"
           cancelLabel="Annuler"
           onCancel={() => dialogs.setPendingDeleteConversation(null)}

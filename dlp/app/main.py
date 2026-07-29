@@ -312,7 +312,9 @@ def ready():
         "status": "READY",
         "presidio": True,
         "languages": ["fr", "en"],
+        "structured_context_languages": ["fr", "en", "ar"],
         "ocr_languages": ["fra", "eng", "ara"],
+        "arabic_ner": False,
     }
 
 

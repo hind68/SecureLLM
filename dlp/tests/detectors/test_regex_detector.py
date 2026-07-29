@@ -126,20 +126,39 @@ def test_detects_single_letter_cin_number():
     matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
     assert any(m["value"] == "A123456" for m in matches)
 
+def test_cin_lookalike_shapes_are_maskable_identifiers_without_context():
+    for value in ["A123456", "AB123456", "BE1234567", "GI22568"]:
+        matches = [m for m in run_regex_detectors(value) if m["type"] == "alphanumeric_identifier"]
+        assert len(matches) == 1
+        assert matches[0]["value"] == value
+        assert matches[0]["severity"] == "medium"
+
 def test_detects_carte_nationale_cin_number():
     text = "Numero de carte nationale BE1234567"
     matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
     assert any(m["value"] == "BE1234567" for m in matches)
 
+def test_detects_english_national_id_context_as_cin():
+    text = "My national ID is AB123456"
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
+    assert any(m["value"] == "AB123456" for m in matches)
+
+def test_detects_arabic_card_context_as_cin():
+    text = "رقم البطاقة الوطنية هو AB123456"
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
+    assert any(m["value"] == "AB123456" for m in matches)
+
 def test_ticket_reference_shape_is_not_cin_without_context():
     text = "La reference du ticket est AB123456."
-    matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
-    assert matches == []
+    matches = run_regex_detectors(text)
+    assert not any(m["type"] == "moroccan_cin" for m in matches)
+    assert any(m["type"] == "alphanumeric_identifier" for m in matches)
 
 def test_build_reference_shape_is_not_cin_without_context():
     text = "Le build AB123456 a echoue."
-    matches = [m for m in run_regex_detectors(text) if m["type"] == "moroccan_cin"]
-    assert matches == []
+    matches = run_regex_detectors(text)
+    assert not any(m["type"] == "moroccan_cin" for m in matches)
+    assert any(m["type"] == "alphanumeric_identifier" for m in matches)
 
 def test_detects_civil_registry_number():
     text = "N d'etat civil 2003/137 figure au dos de la carte."

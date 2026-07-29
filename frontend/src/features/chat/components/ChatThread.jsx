@@ -50,7 +50,7 @@ export default function ChatThread({
         <button
           className={`go-bottom-button ${isGenerating ? 'is-generating' : ''}`}
           type="button"
-          aria-label="Defiler vers le bas"
+          aria-label="Défiler vers le bas"
           onClick={goToBottom}
         >
           {isGenerating ? (

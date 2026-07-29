@@ -28,7 +28,7 @@ export function dlpUserMessage(value) {
   if (payload.code === 'DLP_UNAVAILABLE') {
     return [
       'Contrôle de sécurité indisponible.',
-      "Votre message n’a pas été envoyé au modèle.",
+      'Votre message n’a pas été envoyé au modèle.',
       'Réessayez dans quelques instants.',
     ].join('\n')
   }

@@ -88,8 +88,8 @@ export default function Sidebar({
           <button
             className="sidebar-toggle"
             type="button"
-            title={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
-            aria-label={isSidebarOpen ? 'Reduire la sidebar' : 'Ouvrir la sidebar'}
+            title={isSidebarOpen ? 'Réduire la sidebar' : 'Ouvrir la sidebar'}
+            aria-label={isSidebarOpen ? 'Réduire la sidebar' : 'Ouvrir la sidebar'}
             aria-expanded={isSidebarOpen}
             onClick={toggleSidebar}
           >
@@ -129,8 +129,8 @@ export default function Sidebar({
             <button
               className={isModelsView ? 'active' : ''}
               type="button"
-              title="Explorer les modeles"
-              aria-label="Explorer les modeles"
+              title="Explorer les modèles"
+              aria-label="Explorer les modèles"
               onClick={() => {
                 closeTransientMenus()
                 setIsAccountMenuOpen(false)
@@ -140,14 +140,14 @@ export default function Sidebar({
               <span className="sidebar-icon" aria-hidden="true">
                 <img src="/assets/compass.png" alt="" />
               </span>
-              <span>Explorer les modeles</span>
+              <span>Explorer les modèles</span>
             </button>
           </div>
           <button
             className={`recent-nav-button ${collapsedPanel === 'history' ? 'active' : ''}`}
             type="button"
-            title="Discussions recentes"
-            aria-label="Discussions recentes"
+            title="Discussions récentes"
+            aria-label="Discussions récentes"
             onClick={() => {
               setShowArchived(false)
               if (isSidebarOpen) {
@@ -165,18 +165,18 @@ export default function Sidebar({
             <span className="sidebar-icon" aria-hidden="true">
               <img src="/assets/message.png" alt="" />
             </span>
-            <span>Discussions recentes</span>
+            <span>Discussions récentes</span>
           </button>
         </nav>
 
         <section className="recent-section">
           <div className="history-heading">
-            <span>Recents</span>
+            <span>Récents</span>
             <button
               type="button"
               className="archive-toggle"
-              title={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
-              aria-label={showTabs ? 'Masquer les filtres archives' : 'Afficher les filtres archives'}
+              title={showTabs ? 'Masquer les filtres archivés' : 'Afficher les filtres archivés'}
+              aria-label={showTabs ? 'Masquer les filtres archivés' : 'Afficher les filtres archivés'}
               aria-expanded={showTabs}
               onClick={() => setShowTabs(!showTabs)}
             >
@@ -222,7 +222,7 @@ export default function Sidebar({
       {!isSidebarOpen && collapsedPanel && (
         <div className="collapsed-panel" data-menu-root>
           <div className="collapsed-panel-header">
-            <strong>{collapsedPanel === 'history' ? 'Discussions recentes' : 'Rechercher'}</strong>
+            <strong>{collapsedPanel === 'history' ? 'Discussions récentes' : 'Rechercher'}</strong>
           </div>
 
           {(collapsedPanel === 'search' || collapsedPanel === 'history') && (
@@ -245,7 +245,7 @@ function AccountPopover({ className = 'account-popover-open' }) {
   return (
     <div className={`account-popover ${className}`} role="menu" data-menu-root>
       <button type="button" role="menuitem">
-        Se deconnecter
+        Se déconnecter
       </button>
     </div>
   )

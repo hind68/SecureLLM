@@ -63,15 +63,17 @@ export default function useChatController({
     }
     const prompt = chat.draft.trim()
     if (!prompt) {
-      feedback.showError('Le message ne peut pas etre vide.')
+      feedback.showError('Le message ne peut pas être vide.')
       return
     }
 
     feedback.clearChatError()
+    chat.rememberComposerFocusIntent()
     if (!chat.hasActiveMessages && composerRef.current) {
       composerBeforeRectRef.current = composerRef.current.getBoundingClientRect()
     }
     chat.setDraft('')
+    chat.restoreComposerFocusSoon()
     chat.setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
 
@@ -80,6 +82,7 @@ export default function useChatController({
       void chat.streamMessage(conversation, prompt)
     } catch (error) {
       feedback.showError(friendlyGenerationError(error))
+      chat.restoreComposerFocusSoon()
     }
   }, [actions, chat, composerBeforeRectRef, composerRef, feedback, shouldAutoScrollRef, status.isGenerating])
 
