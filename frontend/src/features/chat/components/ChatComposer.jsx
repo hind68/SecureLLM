@@ -1,14 +1,20 @@
-import { StopIcon } from '../../../components/common/icons'
+import { PlusIcon, StopIcon } from '../../../components/common/icons'
+import FileAttachmentCard from './FileAttachmentCard'
+import { ACCEPTED_ATTACHMENT_EXTENSIONS, MAX_ATTACHMENTS } from '../hooks/useChatUi'
 
 export default function ChatComposer({
   canSend,
+  attachments = [],
   composerRef,
   draft,
   hasActiveMessages,
   isComposerMaxed,
   isGenerating,
   onDraftChange,
+  onFilesSelected,
   onKeyDown,
+  onRemoveFile,
+  onRemoveFiles,
   onSubmit,
   onStop,
   textareaRef,
@@ -19,6 +25,42 @@ export default function ChatComposer({
       className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-welcome composer-center'} ${isComposerMaxed ? 'composer-maxed' : ''} ${isGenerating ? 'is-generating' : ''}`}
       onSubmit={onSubmit}
     >
+      {attachments.length > 0 && (
+        <div className="composer-attachments">
+          {attachments.map((file, index) => (
+            <FileAttachmentCard
+              attachment={file}
+              key={`${file.name}-${file.size}-${index}`}
+              onRemove={() => !isGenerating && onRemoveFile(index)}
+              variant="chip"
+            />
+          ))}
+          <button
+            className="clear-attachments"
+            type="button"
+            aria-label="Retirer toutes les pièces jointes"
+            title="Retirer toutes les pièces jointes"
+            disabled={isGenerating}
+            onClick={onRemoveFiles}
+          >
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+      )}
+      <label className="attach-button" aria-label="Joindre des fichiers" title="Joindre des fichiers">
+        <PlusIcon />
+        <input
+          type="file"
+          multiple
+          hidden
+          accept={ACCEPTED_ATTACHMENT_EXTENSIONS.join(',')}
+          disabled={isGenerating || attachments.length >= MAX_ATTACHMENTS}
+          onChange={(event) => {
+            onFilesSelected(event.target.files)
+            event.target.value = ''
+          }}
+        />
+      </label>
       <textarea
         ref={textareaRef}
         aria-disabled={isGenerating}

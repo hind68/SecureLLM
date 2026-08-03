@@ -19,8 +19,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -95,5 +98,18 @@ public class ConversationController {
             @Valid @RequestBody SendMessageRequest request
     ) {
         return conversationService.streamMessage(id, request);
+    }
+
+    @PostMapping(
+            value = "/conversations/{id}/messages/stream-with-files",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8"
+    )
+    public SseEmitter streamConversationMessageWithFiles(
+            @PathVariable Long id,
+            @RequestParam(required = false, name = "content") String content,
+            @RequestPart(required = false, name = "files") List<MultipartFile> files
+    ) {
+        return conversationService.streamMessage(id, content, files == null ? List.of() : files);
     }
 }

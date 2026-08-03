@@ -52,6 +52,7 @@ export default function useChatController({
     actions.newConversationRecord(modelAlias)
     chat.setMessages([])
     chat.setDraft('')
+    chat.clearAttachments()
     chat.setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
   }, [actions, chat, models.selectedModel, shouldAutoScrollRef])
@@ -62,7 +63,8 @@ export default function useChatController({
       return
     }
     const prompt = chat.draft.trim()
-    if (!prompt) {
+    const attachments = chat.attachments || []
+    if (!prompt && attachments.length === 0) {
       feedback.showError('Le message ne peut pas être vide.')
       return
     }
@@ -73,13 +75,14 @@ export default function useChatController({
       composerBeforeRectRef.current = composerRef.current.getBoundingClientRect()
     }
     chat.setDraft('')
+    chat.clearAttachments()
     chat.restoreComposerFocusSoon()
     chat.setIsLastBlockVisible(true)
     shouldAutoScrollRef.current = true
 
     try {
       const conversation = await actions.ensureConversation(prompt)
-      void chat.streamMessage(conversation, prompt)
+      void chat.streamMessage(conversation, prompt, attachments)
     } catch (error) {
       feedback.showError(friendlyGenerationError(error))
       chat.restoreComposerFocusSoon()

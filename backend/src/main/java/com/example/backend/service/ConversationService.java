@@ -39,6 +39,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -171,10 +172,25 @@ public class ConversationService {
 
     @Transactional
     public StreamPreparation prepareStream(Long conversationId, SendMessageRequest request) {
-        String content = request.content().trim();
+        return prepareStream(conversationId, request.content(), List.of());
+    }
+
+    @Transactional
+    public StreamPreparation prepareStream(Long conversationId, String content, List<MultipartFile> files) {
+        content = content == null ? "" : content.trim();
+        List<MultipartFile> safeFiles = files == null ? List.of() : files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
         if (content.isBlank()) {
+            if (!safeFiles.isEmpty()) {
+                return prepareStreamWithFiles(conversationId, content, safeFiles);
+            }
             throw new ResponseStatusException(BAD_REQUEST, "Message content must not be blank");
         }
+        return prepareStreamWithFiles(conversationId, content, safeFiles);
+    }
+
+    private StreamPreparation prepareStreamWithFiles(Long conversationId, String content, List<MultipartFile> files) {
 
         Conversation conversation = ownedConversation(conversationId);
         if (conversation.getStatut() != StatutConversation.ACTIVE) {
@@ -182,9 +198,14 @@ public class ConversationService {
         }
 
         ModeleLlm generationModel = conversation.getModele();
-        String safeContent;
+        DlpSafeMessage safeMessage;
         try {
-            safeContent = dlpService.safeTextForLlm(content, conversation.getUtilisateur().getExternalId());
+            if (files.isEmpty()) {
+                String safeContent = dlpService.safeTextForLlm(content, conversation.getUtilisateur().getExternalId());
+                safeMessage = new DlpSafeMessage(safeContent, content, null, List.of());
+            } else {
+                safeMessage = dlpService.safeMessageForLlm(content, files, conversation.getUtilisateur().getExternalId());
+            }
         } catch (DlpBlockedException exception) {
             persistBlockedUserMessage(conversation, content, exception);
             throw exception;
@@ -195,12 +216,13 @@ public class ConversationService {
                 RoleMessage.USER,
                 nextOrder,
                 StatutMessage.TERMINE,
-                content,
+                safeMessage.persistedContent(),
                 null
         ));
+        userMessage.setAttachmentMetadataJson(serializeAttachments(safeMessage.attachments()));
 
         if ("Nouvelle conversation".equals(conversation.getTitre())) {
-            conversation.rename(titleFrom(content));
+            conversation.rename(titleFrom(safeMessage.persistedContent()));
         }
 
         Message assistantMessage = messageRepository.save(new Message(
@@ -214,7 +236,7 @@ public class ConversationService {
         ));
         conversation.touchLastMessageAt(Instant.now());
 
-        List<LiteLlmMessage> context = buildContext(conversation, userMessage, safeContent);
+        List<LiteLlmMessage> context = buildContext(conversation, userMessage, files.isEmpty() ? safeMessage.safePrompt() : safeMessage.safePrompt());
         return new StreamPreparation(
                 generationModel.getAliasInterne(),
                 assistantMessage.getId(),
@@ -226,10 +248,15 @@ public class ConversationService {
 
     @Transactional
     public SseEmitter streamMessage(Long conversationId, SendMessageRequest request) {
+        return streamMessage(conversationId, request.content(), List.of());
+    }
+
+    @Transactional
+    public SseEmitter streamMessage(Long conversationId, String content, List<MultipartFile> files) {
         SseEmitter emitter = new SseEmitter(0L);
         StreamPreparation preparation;
         try {
-            preparation = prepareStream(conversationId, request);
+            preparation = prepareStream(conversationId, content, files);
         } catch (DlpAnalysisException exception) {
             trySend(emitter, "error", streamError(exception));
             emitter.complete();
@@ -333,6 +360,7 @@ public class ConversationService {
                 parseDetectedTypes(message.getDlpDetectedTypes()),
                 parseDlpMatches(message.getDlpMatches()),
                 message.getDlpMaskedText(),
+                parseAttachments(message.getAttachmentMetadataJson()),
                 message.getCreatedAt(),
                 message.getUpdatedAt()
         );
@@ -355,6 +383,7 @@ public class ConversationService {
                 serializeDlpMatches(exception.getMatches()),
                 maskedText
         );
+        userMessage.setAttachmentMetadataJson(serializeAttachments(exception.getAttachments()));
         messageRepository.save(userMessage);
         if ("Nouvelle conversation".equals(conversation.getTitre())) {
             conversation.rename(titleFromMasked(maskedText));
@@ -393,6 +422,47 @@ public class ConversationService {
                         + valueOrEmpty(match.lineNumber()) + "\t"
                         + encodeMatchField(match.placeholder()))
                 .collect(Collectors.joining("\n"));
+    }
+
+    private String serializeAttachments(List<AttachmentMetadata> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return "";
+        }
+        return attachments.stream()
+                .map(attachment -> encodeMatchField(attachment.filename()) + "\t"
+                        + encodeMatchField(attachment.mimeType()) + "\t"
+                        + attachment.size() + "\t"
+                        + encodeMatchField(attachment.decision()) + "\t"
+                        + attachment.safeCharacters() + "\t"
+                        + attachment.estimatedTokens() + "\t"
+                        + encodeMatchField(attachment.extractionStatus()))
+                .collect(Collectors.joining("\n"));
+    }
+
+    private List<AttachmentMetadata> parseAttachments(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split("\\R"))
+                .map(this::parseAttachment)
+                .filter(attachment -> attachment != null)
+                .toList();
+    }
+
+    private AttachmentMetadata parseAttachment(String line) {
+        String[] parts = line.split("\\t", -1);
+        if (parts.length != 7) {
+            return null;
+        }
+        return new AttachmentMetadata(
+                decodeMatchField(parts[0]),
+                decodeMatchField(parts[1]),
+                parseLong(parts[2]),
+                decodeMatchField(parts[3]),
+                parseInteger(parts[4]) == null ? 0 : parseInteger(parts[4]),
+                parseInteger(parts[5]) == null ? 0 : parseInteger(parts[5]),
+                decodeMatchField(parts[6])
+        );
     }
 
     private List<DlpPublicMatch> parseDlpMatches(String matches) {
@@ -442,6 +512,17 @@ public class ConversationService {
         }
     }
 
+    private long parseLong(String value) {
+        if (value == null || value.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            return 0L;
+        }
+    }
+
     private void trySend(SseEmitter emitter, String event, Object value) {
         try {
             emitter.send(SseEmitter.event().name(event).data(value));
@@ -458,7 +539,8 @@ public class ConversationService {
                     blockedException.getDetectedTypes(),
                     blockedException.getHighestSeverity(),
                     blockedException.getMaskedText(),
-                    blockedException.getMatches()
+                    blockedException.getMatches(),
+                    blockedException.getAttachments()
             );
         }
         if (exception instanceof DlpUnavailableException) {
@@ -468,6 +550,7 @@ public class ConversationService {
                     Set.of(),
                     null,
                     null,
+                    List.of(),
                     List.of()
             );
         }
@@ -477,6 +560,7 @@ public class ConversationService {
                 Set.of(),
                 null,
                 null,
+                List.of(),
                 List.of()
         );
     }
@@ -488,6 +572,9 @@ public class ConversationService {
 
     private String titleFrom(String content) {
         String compact = content.replaceAll("\\s+", " ").trim();
+        if (compact.regionMatches(true, 0, "Pieces jointes:", 0, "Pieces jointes:".length())) {
+            return "Nouvelle conversation";
+        }
         String[] words = compact.split("\\s+");
         List<String> meaningfulWords = new ArrayList<>();
         for (String word : words) {
@@ -547,7 +634,8 @@ public class ConversationService {
             Set<String> detectedTypes,
             String highestSeverity,
             String maskedText,
-            List<DlpPublicMatch> matches
+            List<DlpPublicMatch> matches,
+            List<AttachmentMetadata> attachments
     ) {
     }
 }

@@ -6,7 +6,6 @@ from app.policy import severity_for
 
 
 ENTITY_TYPE_MAP = {
-    "PERSON": "person_name",
     "EMAIL_ADDRESS": "email",
     "PHONE_NUMBER": "phone_number",
     "CREDIT_CARD": "credit_card",
@@ -108,6 +107,8 @@ def detect_with_presidio(text: str, language: str = "en") -> list[dict]:
     results = get_analyzer().analyze(text=text, language=language)
     matches = []
     for result in results:
+        if result.entity_type == "PERSON":
+            continue
         detected_text = text[result.start:result.end]
         if _is_generic_nlp_false_positive(result.entity_type, detected_text, text):
             continue

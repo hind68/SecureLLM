@@ -1,6 +1,7 @@
 package com.example.backend.dto;
 
 import com.example.backend.integration.dlp.DlpPublicMatch;
+import com.example.backend.service.AttachmentMetadata;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,6 +18,7 @@ public record MessageResponse(
         List<String> dlpDetectedTypes,
         List<DlpPublicMatch> dlpMatches,
         String dlpMaskedText,
+        List<AttachmentMetadata> attachments,
         Instant createdAt,
         Instant updatedAt
 ) {

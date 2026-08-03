@@ -100,7 +100,11 @@ def _compile_rule(entry: dict) -> dict:
 def load_patterns(path: Path = _PATTERNS_FILE) -> list[dict]:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return [_compile_rule(entry) for entry in data.get("patterns", [])]
+    return [
+        _compile_rule(entry)
+        for entry in data.get("patterns", [])
+        if _TYPE_ALIASES.get(entry.get("type"), entry.get("type")) != "person_name"
+    ]
 
 
 _rules = load_patterns()
@@ -178,6 +182,8 @@ def add_pattern(
     """
     if severity not in _VALID_SEVERITIES:
         raise ValueError(f"severity must be one of {sorted(_VALID_SEVERITIES)}, got '{severity}'")
+    if _TYPE_ALIASES.get(pii_type, pii_type) == "person_name":
+        raise ValueError("person_name detection is disabled by policy")
     if validator is not None and validator not in _VALIDATORS:
         raise ValueError(f"Unknown validator '{validator}'. Known validators: {sorted(_VALIDATORS)}")
     try:

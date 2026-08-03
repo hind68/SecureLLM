@@ -90,11 +90,10 @@ export function modelLogoSrc(alias) {
 }
 
 export function titleFrom(content) {
-  const compact = content.replace(/\s+/g, ' ').trim()
-  const words = compact
-    .split(' ')
-    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ''))
-    .filter((word) => word.length >= 4)
-    .slice(0, 6)
-  return words.length > 0 ? `Discussion: ${words.join(' ')}` : 'Nouvelle conversation'
+  const compact = content
+    .replace(/^Pieces jointes\s*:[^\n]*(?:\n|$)/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!compact) return 'Nouvelle conversation'
+  return `Discussion: ${compact.length > 72 ? `${compact.slice(0, 69)}...` : compact}`
 }

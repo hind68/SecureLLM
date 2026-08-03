@@ -279,8 +279,8 @@ def test_contact_sentence_detects_person_and_email():
     data = client.post("/analyse", json={"text": "Contactez Jean Dupont a client@example.com"}).json()
     types = {match["type"] for match in data["matches"]}
 
-    assert data["decision"] in {"MASK", "BLOCK"}
-    assert "person_name" in types
+    assert data["decision"] == "MASK"
+    assert "person_name" not in types
     assert "email" in types
 
 

@@ -2,6 +2,7 @@ import { Fragment, memo, useMemo, useState } from 'react'
 import { CheckIcon, CopyIcon } from '../../../components/common/icons'
 import ModelLogo from '../../models/components/ModelLogo'
 import MarkdownContent from './MarkdownContent'
+import FileAttachmentCard from './FileAttachmentCard'
 import { cleanModelName, modelCardMeta } from '../../../utils/modelMetadata'
 import { dlpUserMessage } from '../utils/dlpErrors'
 import { splitMaskedTextByPlaceholders, normalizeSensitiveSpans, splitTextBySpans } from '../utils/dlpViews'
@@ -22,6 +23,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
   const isAlertCopied = copiedKey === alertCopyKey
   const isSafeCopied = copiedKey === safeCopyKey
   const textDirection = detectTextDirection(message.content || '')
+  const visibleContent = displayableMessageContent(message)
 
   async function copyResponse(copyKey = messageCopyKey, text = message.content || '') {
     const success = await onCopy(text)
@@ -33,18 +35,21 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
     return (
       <Fragment>
         <article className="message user">
-          <div className="bubble">
-            <div className="user-message-wrap">
-              <p>{message.content}</p>
-            </div>
+          <div className="user-message-stack">
+            <AttachmentList attachments={message.attachments} />
+            {visibleContent && (
+              <div className="user-text-bubble">
+                <p>{visibleContent}</p>
+              </div>
+            )}
           </div>
-          {message.content && (
+          {visibleContent && (
             <div className="message-actions user-actions">
               <button
                 type="button"
                 aria-label={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
                 title={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
-                onClick={() => copyResponse(promptCopyKey)}
+                onClick={() => copyResponse(promptCopyKey, visibleContent)}
               >
                 {isPromptCopied ? <CheckIcon /> : <CopyIcon />}
               </button>
@@ -71,8 +76,16 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
       <div className="bubble">
         {!isUser && <AssistantMessageHeader modelAlias={message.modelAlias} modelName={modelName} />}
         {isUser ? (
-          <div className="user-message-wrap">
-            <p>{message.content}</p>
+          <div className="user-message-stack">
+            <AttachmentList attachments={message.attachments} />
+            {visibleContent && (
+              <div className="user-text-bubble">
+                <p>{visibleContent}</p>
+              </div>
+            )}
+            {hasMaskedAttachment(message.attachments) && (
+              <p className="dlp-mask-note">Certaines donnees ont ete masquees avant envoi.</p>
+            )}
           </div>
         ) : isWaiting ? (
           <TypingIndicator />
@@ -102,13 +115,13 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
           </>
         )}
       </div>
-      {isUser && !isDlpBlocked && message.content && (
+      {isUser && !isDlpBlocked && visibleContent && (
         <div className="message-actions user-actions">
           <button
             type="button"
             aria-label={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
             title={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
-            onClick={() => copyResponse(promptCopyKey)}
+            onClick={() => copyResponse(promptCopyKey, visibleContent)}
           >
             {isPromptCopied ? <CheckIcon /> : <CopyIcon />}
           </button>
@@ -172,6 +185,7 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
             </button>
           </div>
           <HighlightedPre parts={safeParts} />
+          <AttachmentList attachments={message.attachments} />
           <DetectionList matches={matches} />
         </section>
       )}
@@ -203,6 +217,33 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
       </div>
     </div>
   )
+}
+
+function displayableMessageContent(message) {
+  const content = message.content || ''
+  const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0
+  if (hasAttachments && /^Pieces jointes\s*:/i.test(content.trim())) {
+    return ''
+  }
+  return content
+}
+
+function AttachmentList({ attachments }) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return null
+  return (
+    <ul className="message-attachments">
+      {attachments.map((attachment, index) => (
+        <FileAttachmentCard
+          attachment={attachment}
+          key={`${attachment.filename || attachment.name}-${index}`}
+        />
+      ))}
+    </ul>
+  )
+}
+
+function hasMaskedAttachment(attachments) {
+  return Array.isArray(attachments) && attachments.some((attachment) => attachment.decision === 'MASK')
 }
 
 function SecurityIcon() {

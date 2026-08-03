@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from 'react'
 import ChatComposer from '../chat/components/ChatComposer'
 import ChatThread from '../chat/components/ChatThread'
 import ConfirmDialog from '../../components/common/ConfirmDialog'
@@ -19,6 +20,43 @@ export default function AppLayout({
 }) {
   const { state, filters, editing, dialogs, actions, status } = conversations
   const activeConversation = state.activeConversation
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  const containsFiles = useCallback((event) => (
+    Array.from(event.dataTransfer?.types || []).includes('Files')
+  ), [])
+
+  const handleDragEnter = useCallback((event) => {
+    if (!containsFiles(event)) return
+    event.preventDefault()
+    dragDepthRef.current += 1
+    setIsDraggingFiles(true)
+  }, [containsFiles])
+
+  const handleDragOver = useCallback((event) => {
+    if (!containsFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }, [containsFiles])
+
+  const handleDragLeave = useCallback((event) => {
+    if (!containsFiles(event)) return
+    event.preventDefault()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) {
+      setIsDraggingFiles(false)
+    }
+  }, [containsFiles])
+
+  const handleDrop = useCallback((event) => {
+    if (!containsFiles(event)) return
+    event.preventDefault()
+    dragDepthRef.current = 0
+    setIsDraggingFiles(false)
+    if (status.isGenerating) return
+    chat.addAttachments(event.dataTransfer.files)
+  }, [chat, containsFiles, status.isGenerating])
 
   return (
     <div className={`app-shell ${layout.isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -80,7 +118,21 @@ export default function AppLayout({
         />
       )}
 
-      <main className={`chat-main ${chat.hasActiveMessages ? 'conversation-mode' : 'welcome-mode'}`}>
+      <main
+        className={`chat-main ${chat.hasActiveMessages ? 'conversation-mode' : 'welcome-mode'} ${isDraggingFiles ? 'is-dragging-files' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {isDraggingFiles && (
+          <div className="drag-drop-overlay" aria-live="polite">
+            <div className="drag-drop-card">
+              <span className="drag-drop-icon" aria-hidden="true"></span>
+              <strong>Glissez-déposez vos fichiers ici</strong>
+            </div>
+          </div>
+        )}
         <header className="chat-header">
           <div className="header-controls">
             <ModelSelector
@@ -139,6 +191,7 @@ export default function AppLayout({
         />
 
         <ChatComposer
+          attachments={chat.attachments}
           canSend={chat.canSend}
           composerRef={chat.composerRef}
           draft={chat.draft}
@@ -146,7 +199,10 @@ export default function AppLayout({
           isComposerMaxed={chat.isComposerMaxed}
           isGenerating={status.isGenerating}
           onDraftChange={chat.setDraft}
+          onFilesSelected={chat.addAttachments}
           onKeyDown={chat.handleKeyDown}
+          onRemoveFile={chat.removeAttachment}
+          onRemoveFiles={chat.clearAttachments}
           onStop={chat.stopGeneration}
           onSubmit={actions.sendMessage}
           textareaRef={chat.textareaRef}

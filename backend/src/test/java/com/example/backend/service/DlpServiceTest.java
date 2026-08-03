@@ -6,6 +6,8 @@ import com.example.backend.integration.dlp.DlpClient;
 import com.example.backend.integration.dlp.DlpDecision;
 import com.example.backend.integration.dlp.DlpInvalidResponseException;
 import com.example.backend.integration.dlp.DlpMatch;
+import com.example.backend.integration.dlp.DlpMultiSourceAnalysisResponse;
+import com.example.backend.integration.dlp.DlpSourceResult;
 import com.example.backend.integration.dlp.DlpUnavailableException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class DlpServiceTest {
@@ -88,7 +92,67 @@ class DlpServiceTest {
                 .isInstanceOf(DlpInvalidResponseException.class);
     }
 
+    @Test
+    void analyseMessageBuildsSafePromptFromMaskedSourcesOnly() {
+        MockMultipartFile file = new MockMultipartFile("files", "client.txt", "text/plain", "email".getBytes());
+        List<MultipartFile> files = List.of(file);
+        when(dlpClient.analyseMessage("Resume", files, "demo-user"))
+                .thenReturn(new DlpMultiSourceAnalysisResponse(
+                        "SUCCESS",
+                        DlpDecision.MASK,
+                        true,
+                        "medium",
+                        List.of(
+                                source("message", DlpDecision.ALLOW, "Resume", List.of()),
+                                source("client.txt", DlpDecision.MASK, "Contact [EMAIL_1]", List.of(
+                                        new DlpMatch("email_1", "email", 8, 26, "medium", "regex", 1.0, null)
+                                ))
+                        ),
+                        List.of()
+                ));
+
+        DlpSafeMessage safe = dlpService.safeMessageForLlm("Resume", files, "demo-user");
+
+        assertThat(safe.safePrompt())
+                .contains("Message utilisateur :\nResume")
+                .contains("--- Fichier : client.txt ---")
+                .contains("Contact [EMAIL_1]")
+                .doesNotContain("client@example.com");
+        assertThat(safe.attachments()).hasSize(1);
+        assertThat(safe.attachments().get(0).decision()).isEqualTo("MASK");
+    }
+
+    @Test
+    void analyseMessageBlocksWhenOneAttachmentBlocks() {
+        MockMultipartFile file = new MockMultipartFile("files", "secret.txt", "text/plain", "secret".getBytes());
+        List<MultipartFile> files = List.of(file);
+        when(dlpClient.analyseMessage("", files, "demo-user"))
+                .thenReturn(new DlpMultiSourceAnalysisResponse(
+                        "SUCCESS",
+                        DlpDecision.BLOCK,
+                        true,
+                        "high",
+                        List.of(source("secret.txt", DlpDecision.BLOCK, "Token [OPENAI_API_KEY_1]", List.of(
+                                new DlpMatch("openai_api_key_1", "openai_api_key", 6, 36, "high", "regex", 1.0, null)
+                        ))),
+                        List.of()
+                ));
+
+        assertThatThrownBy(() -> dlpService.safeMessageForLlm("", files, "demo-user"))
+                .isInstanceOf(DlpBlockedException.class)
+                .satisfies(exception -> {
+                    DlpBlockedException blocked = (DlpBlockedException) exception;
+                    assertThat(blocked.getDetectedTypes()).containsExactly("openai_api_key");
+                    assertThat(blocked.getAttachments()).extracting("filename", "decision")
+                            .containsExactly(org.assertj.core.groups.Tuple.tuple("secret.txt", "BLOCK"));
+                });
+    }
+
     private DlpAnalysisResponse response(DlpDecision decision, String maskedText, List<DlpMatch> matches) {
         return new DlpAnalysisResponse("SUCCESS", decision, false, "HIGH", maskedText, matches, List.of());
+    }
+
+    private DlpSourceResult source(String source, DlpDecision decision, String maskedText, List<DlpMatch> matches) {
+        return new DlpSourceResult(source, "SUCCESS", decision, !matches.isEmpty(), null, maskedText, matches, List.of());
     }
 }

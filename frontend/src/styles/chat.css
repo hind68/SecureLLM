@@ -121,11 +121,11 @@
 
 /* Return-to-bottom control */
 .go-bottom-button {
-  position: fixed;
-  z-index: 20;
-  left: calc(var(--sidebar-total-open-width) + (100vw - var(--sidebar-total-open-width)) / 2);
-  bottom: 98px;
-  transform: translateX(-50%);
+  position: absolute;
+  z-index: 50;
+  right: 32px;
+  bottom: 100px;
+  transform: none;
   width: 34px;
   height: 32px;
   border: 1px solid rgba(218, 218, 218, 0.65);
@@ -143,7 +143,7 @@
 }
 
 .sidebar-closed .go-bottom-button {
-  left: calc(var(--sidebar-closed-width) + (100vw - var(--sidebar-closed-width)) / 2);
+  right: 32px;
 }
 
 .down-arrow-icon {

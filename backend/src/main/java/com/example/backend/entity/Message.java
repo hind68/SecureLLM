@@ -63,6 +63,9 @@ public class Message {
     @Column(name = "dlp_masked_text", columnDefinition = "TEXT")
     private String dlpMaskedText;
 
+    @Column(name = "attachment_metadata_json", columnDefinition = "TEXT")
+    private String attachmentMetadataJson;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -124,6 +127,10 @@ public class Message {
         this.dlpMaskedText = maskedText;
     }
 
+    public void setAttachmentMetadataJson(String attachmentMetadataJson) {
+        this.attachmentMetadataJson = attachmentMetadataJson;
+    }
+
     public Long getId() {
         return id;
     }
@@ -170,6 +177,10 @@ public class Message {
 
     public String getDlpMaskedText() {
         return dlpMaskedText;
+    }
+
+    public String getAttachmentMetadataJson() {
+        return attachmentMetadataJson;
     }
 
     public Instant getCreatedAt() {

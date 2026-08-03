@@ -4,6 +4,16 @@ import useMessageStream from './useMessageStream'
 import { logDevelopmentError } from '../../../utils/errors'
 import { focusTextareaOnNextFrame, shouldFocusComposer } from '../utils/composerFocus'
 
+export const MAX_ATTACHMENTS = 5
+export const ACCEPTED_ATTACHMENT_EXTENSIONS = [
+  '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
+  '.docx', '.pptx', '.csv', '.xlsx', '.zip',
+  '.txt', '.md', '.log', '.py', '.pyw', '.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.java',
+  '.js', '.jsx', '.ts', '.tsx', '.go', '.rb', '.php', '.rs', '.swift', '.kt', '.kts',
+  '.scala', '.sh', '.bash', '.ps1', '.sql', '.r', '.ini', '.cfg', '.conf', '.toml',
+  '.yml', '.yaml', '.json', '.xml', '.html', '.htm', '.css',
+]
+
 /**
  * Groups the chat surface state that is independent from conversation CRUD.
  *
@@ -24,6 +34,7 @@ export default function useChatUi({
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [copiedKey, setCopiedKey] = useState('')
+  const [attachments, setAttachments] = useState([])
   const [isComposerMaxed, setIsComposerMaxed] = useState(false)
   const [isComposerTransitioning, setIsComposerTransitioning] = useState(false)
 
@@ -34,7 +45,7 @@ export default function useChatUi({
   const shouldRestoreComposerFocusRef = useRef(false)
 
   const hasActiveMessages = messages.length > 0
-  const canSend = Boolean(activeModelAlias && draft.trim() && !isGenerating)
+  const canSend = Boolean(activeModelAlias && (draft.trim() || attachments.length > 0) && !isGenerating)
   const {
     bottomRef,
     goToBottom,
@@ -150,6 +161,32 @@ export default function useChatUi({
     }
   }, [isGenerating])
 
+  const addAttachments = useCallback((fileList) => {
+    const incoming = Array.from(fileList || [])
+    const accepted = []
+    for (const file of incoming) {
+      const extension = `.${file.name.split('.').pop() || ''}`.toLowerCase()
+      if (!ACCEPTED_ATTACHMENT_EXTENSIONS.includes(extension)) {
+        showError(`Fichier non supporte : ${file.name}`)
+        continue
+      }
+      accepted.push(file)
+    }
+    setAttachments((current) => {
+      const remaining = Math.max(0, MAX_ATTACHMENTS - current.length)
+      if (accepted.length > remaining) {
+        showError(`Vous pouvez joindre au maximum ${MAX_ATTACHMENTS} fichiers.`)
+      }
+      return [...current, ...accepted.slice(0, remaining)]
+    })
+  }, [showError])
+
+  const removeAttachment = useCallback((index) => {
+    setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+  }, [])
+
+  const clearAttachments = useCallback(() => setAttachments([]), [])
+
   const onCopy = useCallback(async (text) => {
     if (!text) return false
     try {
@@ -165,6 +202,9 @@ export default function useChatUi({
   return {
     bottomRef,
     canSend,
+    attachments,
+    addAttachments,
+    clearAttachments,
     composerBeforeRectRef,
     composerRef,
     copiedKey,
@@ -182,6 +222,7 @@ export default function useChatUi({
     onMessagesScroll,
     setCopiedKey,
     setDraft,
+    setAttachments,
     setIsLastBlockVisible,
     setMessages,
     shouldAutoScrollRef,
@@ -189,6 +230,7 @@ export default function useChatUi({
     restoreComposerFocusSoon,
     stopGeneration,
     streamMessage,
+    removeAttachment,
     textareaRef,
   }
 }

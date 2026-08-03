@@ -96,6 +96,7 @@ export default function useMessageStream({
                     dlpHighestSeverity: parsed.highestSeverity,
                     dlpDetectedTypes: parsed.detectedTypes || [],
                     dlpMatches: parsed.matches || [],
+                    attachments: parsed.attachments || item.attachments || [],
                   }
                 : item,
             )
@@ -116,7 +117,7 @@ export default function useMessageStream({
     return `${prefix}-${localIdCounterRef.current}`
   }, [])
 
-  const streamMessage = useCallback(async (conversation, prompt) => {
+  const streamMessage = useCallback(async (conversation, prompt, attachments = []) => {
     const modelName = modelDisplayName(conversation.modelAlias)
     // Optimistic local ids keep the UI stable while the backend persists and returns server ids.
     const localUserId = nextLocalId('local-user')
@@ -128,7 +129,7 @@ export default function useMessageStream({
 
     updateConversationMessages(conversation.id, (current) => [
       ...current,
-      { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt },
+      { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt, attachments: attachmentPreview(attachments) },
       {
         id: localAssistantId,
         role: 'ASSISTANT',
@@ -140,7 +141,7 @@ export default function useMessageStream({
     ])
 
     try {
-      const response = await streamConversationMessage(conversation.id, prompt, abortController.signal)
+      const response = await streamConversationMessage(conversation.id, prompt, abortController.signal, attachments)
 
       if (!response.ok || !response.body) throw new Error('Erreur pendant le streaming LiteLLM')
 
@@ -213,4 +214,12 @@ export default function useMessageStream({
     streamMessage,
     stopGeneration,
   }
+}
+
+function attachmentPreview(files) {
+  return files.map((file) => ({
+    filename: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    size: file.size,
+  }))
 }
