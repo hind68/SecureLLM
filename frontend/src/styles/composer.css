@@ -171,30 +171,37 @@
 }
 
 .attachment-chip {
-  max-width: min(320px, 100%);
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background-color: #F3F4F6;
-  border: 1px solid #E5E7EB;
-  border-radius: 8px;
-  padding: 6px 12px;
+  gap: 12px;
+  background-color: #FFFFFF;
+  border: 1px solid #ebedee;
+  border-radius: 12px;
+  padding: 12px;
   margin-bottom: 8px;
+  overflow: visible;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .attachment-chip-copy {
   min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: 2px;
 }
 
 .attachment-name {
-  color: #111827;
+  max-width: 260px;
+  min-width: 0;
+  color: #374151;
   font-size: 13px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .attachment-size {
@@ -231,20 +238,68 @@
   
 }
 
-.attachment-chip button {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  background: transparent;
-  color: #9CA3AF;
-  font-size: 18px;
+.attachment-remove-button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #111111;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
-  transition: color 0.2s ease, background-color 0.2s ease;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+  transition: opacity 0.16s ease, transform 0.16s ease, background-color 0.16s ease;
 }
 
-.attachment-chip button:hover {
-  background: transparent;
-  color: #EF4444;
+.attachment-remove-button:hover {
+  background: #000000;
+}
+
+.attachment-remove-button span {
+  width: 12px;
+  height: 12px;
+  display: block;
+  position: relative;
+  font-size: 0;
+  line-height: 0;
+}
+
+.attachment-remove-button span::before,
+.attachment-remove-button span::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 1px;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.attachment-remove-button span::before {
+  transform: rotate(45deg);
+}
+
+.attachment-remove-button span::after {
+  transform: rotate(-45deg);
+}
+
+.attachment-remove-button:focus-visible,
+.attachment-chip:hover .attachment-remove-button,
+.attachment-chip:focus-within .attachment-remove-button {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
 }
 
 .composer button.clear-attachments {
@@ -346,25 +401,6 @@
   height: 16px;
 }
 
-.composer .attach-button:hover .plus-icon {
-  margin: 0;
-  padding: 0;
-  line-height: 1;
-  font-size: 20px;
-  font-weight: 400 !important;
-}
-
-.composer .attach-button:hover .plus-icon,
-.composer .attach-button:hover .plus-icon::before,
-.composer .attach-button:hover .plus-icon::after {
-  font-weight: 400 !important;
-  height: 2px;
-}
-
-.composer .attach-button:hover .plus-icon::after {
-  width: 2px;
-  height: 16px;
-}
 
 .x-icon {
   width: 12px;

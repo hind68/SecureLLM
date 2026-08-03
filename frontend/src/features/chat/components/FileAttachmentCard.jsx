@@ -16,18 +16,19 @@ export default function FileAttachmentCard({ attachment, variant = 'message', on
   if (variant === 'chip') {
     return (
       <div className="attachment-chip">
-        {getFileIcon(filename, 24)}
+        {getFileIcon(filename, 32)}
         <span className="attachment-chip-copy">
           <span className="attachment-name" title={filename}>{filename}</span>
           <span className="attachment-size">{formatBytes(size)}</span>
         </span>
         <button
+          className="attachment-remove-button"
           type="button"
           aria-label={`Retirer ${filename}`}
           title={`Retirer ${filename}`}
           onClick={onRemove}
         >
-          <span aria-hidden="true">×</span>
+          <span aria-hidden="true" />
         </button>
       </div>
     )

@@ -22,7 +22,7 @@
 }
 
 .message.user .bubble {
-  max-width: min(640px, 88%);
+  max-width: min(600px, 82%);
   border-radius: 0;
   background: transparent;
   padding: 0;
@@ -35,7 +35,7 @@
 }
 
 .user-message-stack {
-  max-width: min(640px, 88%);
+  max-width: min(600px, 82%);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -43,12 +43,18 @@
 }
 
 .user-text-bubble {
-  min-width: 200px;
-  max-width: fit-content;
+  width: fit-content;
+  max-width: 100%;
   border-radius: 18px 18px 0 18px;
   background-color: #F3F4F6;
   color: #111827;
   padding: 10px 16px;
+}
+
+.user-text-bubble p {
+  margin: 0;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .message.assistant .bubble {
@@ -431,7 +437,7 @@
   align-items: center;
   gap: 12px;
   background-color: #FFFFFF;
-  border: 1px solid #F3F4F6;
+  border: 1px solid #ebedee;
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 0;
@@ -520,5 +526,4 @@
     transform: translateY(-4px);
   }
 }
-
 
