@@ -461,12 +461,12 @@
   height: 28px;
 }
 
-.sidebar-closed .chat-main {
+.sidebar-closed .chat-workspace {
   margin-left: var(--sidebar-closed-width);
 }
 
-.sidebar-open .chat-main,
-.chat-main {
+.sidebar-open .chat-workspace,
+.chat-workspace {
   margin-left: var(--sidebar-open-width);
 }
 

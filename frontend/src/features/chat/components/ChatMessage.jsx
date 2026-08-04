@@ -8,7 +8,7 @@ import { dlpUserMessage } from '../utils/dlpErrors'
 import { splitMaskedTextByPlaceholders, normalizeSensitiveSpans, splitTextBySpans } from '../utils/dlpViews'
 import { detectTextDirection } from '../utils/markdown'
 
-function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedKey }) {
+function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, onInspectDocument, setCopiedKey }) {
   const isUser = message.role === 'USER'
   const isDlpBlocked = message.status === 'DLP_BLOCKED'
   const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, message.modelAlias)
@@ -36,7 +36,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
       <Fragment>
         <article className="message user">
           <div className="user-message-stack">
-            <AttachmentList attachments={message.attachments} />
+            <AttachmentList attachments={message.attachments} onInspectDocument={onInspectDocument} />
             {visibleContent && (
               <div className="user-text-bubble">
                 <p>{visibleContent}</p>
@@ -64,6 +64,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
               message={message}
               onCopyAlert={(text) => copyResponse(alertCopyKey, text)}
               onCopySafe={(text) => copyResponse(safeCopyKey, text)}
+              onInspectDocument={onInspectDocument}
             />
           </div>
         </article>
@@ -77,14 +78,14 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
         {!isUser && <AssistantMessageHeader modelAlias={message.modelAlias} modelName={modelName} />}
         {isUser ? (
           <div className="user-message-stack">
-            <AttachmentList attachments={message.attachments} />
+            <AttachmentList attachments={message.attachments} onInspectDocument={onInspectDocument} />
             {visibleContent && (
               <div className="user-text-bubble">
                 <p>{visibleContent}</p>
               </div>
             )}
             {hasMaskedAttachment(message.attachments) && (
-              <p className="dlp-mask-note">Certaines donnees ont ete masquees avant envoi.</p>
+              <p className="dlp-mask-note">Certaines données ont été masquées avant envoi.</p>
             )}
           </div>
         ) : isWaiting ? (
@@ -131,10 +132,12 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, setCopiedK
   )
 }
 
-function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySafe }) {
+function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySafe, onInspectDocument }) {
   const [showSafe, setShowSafe] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const matches = useMemo(() => message.dlpMatches || [], [message.dlpMatches])
+  const attachments = Array.isArray(message.attachments) ? message.attachments : []
+  const hasDlpFiles = attachments.length > 0
   const safeText = message.dlpMaskedText || ''
   const originalText = message.dlpOriginalText || ''
   const hasOriginal = Boolean(originalText)
@@ -151,6 +154,15 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
     () => splitTextBySpans(originalText, normalizeSensitiveSpans(originalText, matches)),
     [matches, originalText],
   )
+
+  function handleInspectDocument() {
+    // TODO: Ouvrir le panneau latéral d'inspection de document.
+    onInspectDocument?.({
+      attachment: attachments[0],
+      matches,
+      maskedText: safeText,
+    })
+  }
 
   return (
     <div className="dlp-alert" role="alert">
@@ -171,7 +183,39 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
           {alertCopied ? <CheckIcon /> : <CopyIcon />}
         </button>
       </div>
-      {showSafe && (
+      {hasDlpFiles ? (
+        <section className="dlp-file-panel">
+          <div className="dlp-file-inspection-row">
+            <AttachmentList attachments={attachments} hideViewButton onInspectDocument={onInspectDocument} />
+            <button type="button" className="dlp-inspect-button" onClick={handleInspectDocument}>
+              Inspecter le document
+            </button>
+          </div>
+          <DetectionList matches={matches} />
+        </section>
+      ) : (
+        <div className="dlp-alert-tabs">
+          <button
+            type="button"
+            aria-controls={`dlp-safe-${message.id}`}
+            aria-expanded={showSafe}
+            onClick={() => setShowSafe((current) => !current)}
+          >
+            {showSafe ? 'Masquer la version sécurisée' : 'Voir la version sécurisée'}
+          </button>
+          <button
+            type="button"
+            aria-controls={`dlp-original-${message.id}`}
+            aria-expanded={showOriginal}
+            disabled={!hasOriginal}
+            title={hasOriginal ? undefined : 'Disponible uniquement avant actualisation'}
+            onClick={() => setShowOriginal((current) => !current)}
+          >
+            {showOriginal ? 'Masquer la localisation' : 'Localiser dans mon message'}
+          </button>
+        </div>
+      )}
+      {!hasDlpFiles && showSafe && (
         <section className="dlp-detail-panel" id={`dlp-safe-${message.id}`}>
           <div className="dlp-detail-heading">
             <span>Version sécurisée</span>
@@ -185,36 +229,15 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
             </button>
           </div>
           <HighlightedPre parts={safeParts} />
-          <AttachmentList attachments={message.attachments} />
           <DetectionList matches={matches} />
         </section>
       )}
-      {showOriginal && hasOriginal && (
+      {!hasDlpFiles && showOriginal && hasOriginal && (
         <section className="dlp-detail-panel sensitive" id={`dlp-original-${message.id}`}>
           <p className="dlp-sensitive-warning">Cette vue affiche les données sensibles que vous avez saisies.</p>
           <HighlightedPre parts={originalParts} />
         </section>
       )}
-      <div className="dlp-alert-actions">
-        <button
-          type="button"
-          aria-controls={`dlp-safe-${message.id}`}
-          aria-expanded={showSafe}
-          onClick={() => setShowSafe((current) => !current)}
-        >
-          {showSafe ? 'Masquer la version sécurisée' : 'Voir la version sécurisée'}
-        </button>
-        <button
-          type="button"
-          aria-controls={`dlp-original-${message.id}`}
-          aria-expanded={showOriginal}
-          disabled={!hasOriginal}
-          title={hasOriginal ? undefined : 'Disponible uniquement avant actualisation'}
-          onClick={() => setShowOriginal((current) => !current)}
-        >
-          {showOriginal ? 'Masquer la localisation' : 'Localiser dans mon message'}
-        </button>
-      </div>
     </div>
   )
 }
@@ -228,14 +251,16 @@ function displayableMessageContent(message) {
   return content
 }
 
-function AttachmentList({ attachments }) {
+function AttachmentList({ attachments, hideViewButton = false, onInspectDocument }) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null
   return (
     <ul className="message-attachments">
       {attachments.map((attachment, index) => (
         <FileAttachmentCard
           attachment={attachment}
+          hideViewButton={hideViewButton}
           key={`${attachment.filename || attachment.name}-${index}`}
+          onInspect={onInspectDocument}
         />
       ))}
     </ul>
@@ -272,12 +297,21 @@ function DetectionList({ matches }) {
     <ul className="dlp-detections">
       {matches.map((match, index) => (
         <li key={`${match.placeholder || match.type}-${index}`}>
-          <span>{match.placeholder}</span>
-          <small>{match.type}{match.lineNumber ? ` · ligne ${match.lineNumber}` : ''}</small>
+          <span className="dlp-detection-badge">{displayPlaceholder(match)}</span>
+          <span className="dlp-detection-type">{displayDetectionType(match.type)}</span>
+          <small>{match.lineNumber ? `Ligne ${match.lineNumber}` : 'Position non précisée'}</small>
         </li>
       ))}
     </ul>
   )
+}
+
+function displayPlaceholder(match) {
+  return String(match.placeholder || match.type || 'DLP').replace(/^\[|\]$/g, '')
+}
+
+function displayDetectionType(type) {
+  return String(type || 'donnée sensible').replaceAll('_', ' ')
 }
 
 function AssistantMessageHeader({ modelAlias, modelName }) {
@@ -333,6 +367,7 @@ function areChatMessagesEqual(previous, next) {
     previousMessage === nextMessage &&
     previous.fallbackModelName === next.fallbackModelName &&
     previous.onCopy === next.onCopy &&
+    previous.onInspectDocument === next.onInspectDocument &&
     previous.setCopiedKey === next.setCopiedKey
   )
 

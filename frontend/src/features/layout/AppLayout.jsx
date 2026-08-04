@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import ChatComposer from '../chat/components/ChatComposer'
+import DocumentInspectorPanel from '../chat/components/DocumentInspectorPanel'
 import ChatThread from '../chat/components/ChatThread'
 import ConfirmDialog from '../../components/common/ConfirmDialog'
 import Toast from '../../components/common/Toast'
@@ -21,6 +22,7 @@ export default function AppLayout({
   const { state, filters, editing, dialogs, actions, status } = conversations
   const activeConversation = state.activeConversation
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
+  const [inspectedDocument, setInspectedDocument] = useState(null)
   const dragDepthRef = useRef(0)
 
   const containsFiles = useCallback((event) => (
@@ -118,6 +120,7 @@ export default function AppLayout({
         />
       )}
 
+      <div className="chat-workspace">
       <main
         className={`chat-main ${chat.hasActiveMessages ? 'conversation-mode' : 'welcome-mode'} ${isDraggingFiles ? 'is-dragging-files' : ''}`}
         onDragEnter={handleDragEnter}
@@ -186,6 +189,7 @@ export default function AppLayout({
           messages={chat.messages}
           messagesRef={chat.messagesRef}
           onCopy={chat.onCopy}
+          onInspectDocument={setInspectedDocument}
           onMessagesScroll={chat.onMessagesScroll}
           setCopiedKey={chat.setCopiedKey}
         />
@@ -200,6 +204,7 @@ export default function AppLayout({
           isGenerating={status.isGenerating}
           onDraftChange={chat.setDraft}
           onFilesSelected={chat.addAttachments}
+          onInspectDocument={setInspectedDocument}
           onKeyDown={chat.handleKeyDown}
           onRemoveFile={chat.removeAttachment}
           onRemoveFiles={chat.clearAttachments}
@@ -214,6 +219,15 @@ export default function AppLayout({
           onClose={feedback.onClearToast}
         />
       </main>
+
+      {inspectedDocument && (
+        <DocumentInspectorPanel
+          attachment={inspectedDocument}
+          key={`${inspectedDocument.filename || inspectedDocument.name}-${inspectedDocument.size || 0}`}
+          onClose={() => setInspectedDocument(null)}
+        />
+      )}
+      </div>
 
       {dialogs.modelDecision && (
         <div className="decision-backdrop" role="presentation">

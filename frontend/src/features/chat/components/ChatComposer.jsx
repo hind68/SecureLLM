@@ -12,6 +12,7 @@ export default function ChatComposer({
   isGenerating,
   onDraftChange,
   onFilesSelected,
+  onInspectDocument,
   onKeyDown,
   onRemoveFile,
   onRemoveFiles,
@@ -31,6 +32,7 @@ export default function ChatComposer({
             <FileAttachmentCard
               attachment={file}
               key={`${file.name}-${file.size}-${index}`}
+              onInspect={onInspectDocument}
               onRemove={() => !isGenerating && onRemoveFile(index)}
               variant="chip"
             />
@@ -47,6 +49,7 @@ export default function ChatComposer({
           </button>
         </div>
       )}
+      <div className="composer-input-row">
       <label className="attach-button" aria-label="Joindre des fichiers" title="Joindre des fichiers">
         <PlusIcon />
         <input
@@ -81,6 +84,7 @@ export default function ChatComposer({
       >
         {isGenerating ? <StopIcon /> : <span className="send-arrow" aria-hidden="true"></span>}
       </button>
+      </div>
     </form>
   )
 }

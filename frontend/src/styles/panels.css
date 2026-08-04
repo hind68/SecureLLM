@@ -1,4 +1,247 @@
 ﻿/* Collapsed side panels */
+.document-inspector-panel {
+  width: 45%;
+  min-width: 400px;
+  height: 100%;
+  background-color: #E5E7EB;
+  border-left: 1px solid #E5E7EB;
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  resize: horizontal;
+  overflow: auto;
+  direction: rtl;
+  transition: transform 0.3s ease-in-out;
+}
+
+.document-inspector-header {
+  direction: ltr;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #D1D5DB;
+  background: #FFFFFF;
+}
+
+.document-inspector-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.document-inspector-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-inspector-title span {
+  border-radius: 999px;
+  background: #EEF2FF;
+  color: #3730A3;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+
+.document-inspector-header button {
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #4B5563;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.document-inspector-header button:hover {
+  background-color: #E5E7EB;
+  color: #111827;
+}
+
+.document-inspector-tabs {
+  direction: ltr;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  padding: 0 24px;
+}
+
+.document-inspector-tabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #6B7280;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 0;
+  transition: all 0.2s;
+}
+
+.document-inspector-tabs button.active {
+  color: #111827;
+  border-bottom-color: #4F46E5;
+}
+
+.document-inspector-tabs .document-copy-safe {
+  margin-left: auto;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  color: #4F46E5;
+  align-self: center;
+  font-size: 13px;
+  padding: 5px 10px;
+}
+
+.document-inspector-tabs .document-copy-safe:hover {
+  background: #F9FAFB;
+  border-color: #C7D2FE;
+}
+
+.document-inspector-viewer {
+  direction: ltr;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  overflow-y: auto;
+  border-radius: 0;
+  background-color: #E5E7EB;
+  box-shadow: none;
+  color: #374151;
+  padding: 40px 20px;
+}
+
+.document-a4-page {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 1 / 1.414;
+  min-height: auto;
+  margin: 0 auto;
+  border-radius: 0 !important;
+  background-color: #FFFFFF;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  color: #000;
+  font-family: 'Times New Roman', serif;
+  line-height: 1.6;
+  padding: 48px;
+}
+
+.document-a4-page-pdf {
+  padding: 0;
+  overflow: hidden;
+}
+
+.document-secure-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.document-secure-text {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #F9FAFB;
+  color: #374151;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 32px;
+  white-space: pre-wrap;
+}
+
+.document-a4-page p {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.document-inspector-note {
+  border-left: 3px solid #F59E0B;
+  background: #FEF3C7;
+  color: #92400E;
+  font-family: system-ui, sans-serif;
+  padding: 8px 10px;
+}
+
+.document-a4-page pre {
+  margin: 0;
+  color: #000;
+  font-family: 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.document-pdf-viewer {
+  width: 100%;
+  height: 100%;
+  min-height: 80vh;
+  display: block;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.document-image-viewer {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.document-sensitive-mark {
+  border-radius: 4px;
+  background-color: #FEF08A;
+  color: #713F12;
+  padding: 2px 4px;
+}
+
+.document-dlp-mark {
+  border-radius: 4px;
+  padding: 1px 3px;
+}
+
+.document-dlp-mark.severity-low {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.document-dlp-mark.severity-medium {
+  background: #FEF08A;
+  color: #713F12;
+}
+
+.document-dlp-mark.severity-high {
+  background: #FECACA;
+  color: #991B1B;
+}
+
 .collapsed-panel {
   position: fixed;
   z-index: 180;

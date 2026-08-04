@@ -14,6 +14,7 @@ export default function ChatThread({
   messages,
   messagesRef,
   onCopy,
+  onInspectDocument,
   onMessagesScroll,
   setCopiedKey,
 }) {
@@ -40,6 +41,7 @@ export default function ChatThread({
             key={item.id}
             message={item}
             onCopy={onCopy}
+            onInspectDocument={onInspectDocument}
             setCopiedKey={setCopiedKey}
           />
         ))}

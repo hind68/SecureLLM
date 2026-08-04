@@ -5,11 +5,10 @@
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.045);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 6px;
-  padding: 6px 7px 6px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
   font-size: 15.5px;
 }
 
@@ -29,7 +28,7 @@
     0 18px 55px rgba(48, 61, 80, 0.09),
     0 2px 8px rgba(48, 61, 80, 0.04);
   backdrop-filter: blur(14px);
-  padding: 8px 9px 8px 18px;
+  padding: 12px 16px;
 }
 
 .composer-bottom {
@@ -51,6 +50,7 @@
 }
 
 .composer textarea {
+  width: 100%;
   min-height: 34px;
   max-height: 150px;
   overflow-y: hidden;
@@ -65,6 +65,14 @@
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: opacity 160ms ease;
+}
+
+.composer-input-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
 }
 
 .composer.is-generating textarea {
@@ -162,11 +170,10 @@
 
 .composer-attachments {
   position: relative;
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 2px 40px 0 0;
+  padding: 0 40px 0 0;
   align-items: center;
 }
 
@@ -176,14 +183,14 @@
   max-width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background-color: #FFFFFF;
-  border: 1px solid #ebedee;
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 0;
   overflow: visible;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: none !important;
 }
 
 .attachment-chip-copy {
@@ -195,9 +202,9 @@
 .attachment-name {
   max-width: 260px;
   min-width: 0;
-  color: #374151;
+  color: #111827;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.4;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -206,8 +213,13 @@
 
 .attachment-size {
   color: #6B7280;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
+}
+
+.attachment-chip .file-type-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .composer .attach-button {
@@ -238,13 +250,13 @@
   
 }
 
-.attachment-remove-button {
+.composer button.attachment-remove-button {
   position: absolute;
   top: -6px;
   right: -6px;
-  width: 12px;
-  height: 12px;
-  min-width: 12px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
   border: none;
   border-radius: 50%;
   background: #111111;
@@ -261,42 +273,47 @@
   transition: opacity 0.16s ease, transform 0.16s ease, background-color 0.16s ease;
 }
 
-.attachment-remove-button:hover {
+.composer button.attachment-remove-button:hover {
   background: #000000;
 }
 
-.attachment-remove-button span {
-  width: 12px;
-  height: 12px;
+.composer button.attachment-remove-button span,
+.composer button.attachment-remove-button .x-icon {
+  width: 9px;
+  height: 9px;
   display: block;
   position: relative;
   font-size: 0;
   line-height: 0;
 }
 
-.attachment-remove-button span::before,
-.attachment-remove-button span::after {
+.composer button.attachment-remove-button span::before,
+.composer button.attachment-remove-button span::after,
+.composer button.attachment-remove-button .x-icon::before,
+.composer button.attachment-remove-button .x-icon::after {
   content: '';
   position: absolute;
-  top: 5px;
-  left: 1px;
-  width: 10px;
-  height: 2px;
+  top: 4px;
+  left: 0;
+  width: 9px;
+  height: 1.75px;
   border-radius: 999px;
   background: currentColor;
 }
 
-.attachment-remove-button span::before {
+.composer button.attachment-remove-button span::before,
+.composer button.attachment-remove-button .x-icon::before {
   transform: rotate(45deg);
 }
 
-.attachment-remove-button span::after {
+.composer button.attachment-remove-button span::after,
+.composer button.attachment-remove-button .x-icon::after {
   transform: rotate(-45deg);
 }
 
-.attachment-remove-button:focus-visible,
-.attachment-chip:hover .attachment-remove-button,
-.attachment-chip:focus-within .attachment-remove-button {
+.composer button.attachment-remove-button:focus-visible,
+.composer .attachment-chip:hover button.attachment-remove-button,
+.composer .attachment-chip:focus-within button.attachment-remove-button {
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);

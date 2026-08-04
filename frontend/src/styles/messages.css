@@ -22,6 +22,7 @@
 }
 
 .message.user .bubble {
+  width: max-content;
   max-width: min(600px, 82%);
   border-radius: 0;
   background: transparent;
@@ -35,17 +36,18 @@
 }
 
 .user-message-stack {
+  width: max-content;
   max-width: min(600px, 82%);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 4px;
 }
 
 .user-text-bubble {
-  width: fit-content;
+  width: max-content;
   max-width: 100%;
-  border-radius: 18px 18px 0 18px;
+  border-radius: 18px 4px 0 18px;
   background-color: #F3F4F6;
   color: #111827;
   padding: 10px 16px;
@@ -53,8 +55,10 @@
 
 .user-text-bubble p {
   margin: 0;
-  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   white-space: pre-wrap;
+  line-height: 1.5;
 }
 
 .message.assistant .bubble {
@@ -121,6 +125,13 @@
 .bubble p {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.message.user .user-text-bubble p {
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: pre-wrap;
+  line-height: 1.5;
 }
 
 /* Message actions and generation states */
@@ -345,6 +356,78 @@
   opacity: 0.48;
 }
 
+.dlp-alert-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #FECACA;
+}
+
+.dlp-alert-tabs button {
+  background: #FFFFFF;
+  border: 1px solid #FCA5A5;
+  border-radius: 6px;
+  color: #991B1B;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+}
+
+.dlp-alert-tabs button:hover {
+  background-color: #FEE2E2;
+}
+
+.dlp-alert-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dlp-file-panel {
+  display: grid;
+  gap: 0;
+  margin-top: 14px;
+}
+
+.dlp-file-panel .message-attachments {
+  align-items: flex-start;
+}
+
+.dlp-file-inspection-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.dlp-file-inspection-row .message-attachments {
+  flex: 0 1 auto;
+}
+
+.dlp-inspect-button {
+  width: fit-content;
+  border: 1px solid #FCA5A5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #991B1B;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  transition: 0.2s;
+}
+
+.dlp-inspect-button:hover {
+  border-color: #F87171;
+  background-color: #FEE2E2;
+}
+
 .dlp-detail-panel {
   margin-top: 12px;
   animation: assistant-error-in 180ms ease-out both;
@@ -393,23 +476,42 @@
 }
 
 .dlp-detections {
-  display: grid;
-  gap: 5px;
-  margin: 9px 0 0;
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 0;
+  border-top: 1px solid #FECACA;
+  padding: 16px 0 0;
   list-style: none;
 }
 
 .dlp-detections li {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  color: #7f1d1d;
-  font-size: 12px;
+  align-items: center;
+  gap: 12px;
+  color: #7F1D1D;
+  font-size: 13px;
+}
+
+.dlp-detection-badge {
+  border-radius: 6px;
+  background-color: #FEE2E2;
+  color: #991B1B;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+}
+
+.dlp-detection-type {
+  color: #7F1D1D;
+  font-size: 13px;
 }
 
 .dlp-detections small {
-  color: #9f3434;
+  margin-left: auto;
+  color: #9CA3AF;
+  font-size: 12px;
 }
 
 .dlp-sensitive-warning {
@@ -424,7 +526,7 @@
   flex-direction: column;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -437,11 +539,11 @@
   align-items: center;
   gap: 12px;
   background-color: #FFFFFF;
-  border: 1px solid #ebedee;
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  box-shadow: none;
 }
 
 .file-message-copy {
@@ -456,15 +558,23 @@
   word-break: break-word;
   white-space: normal;
   line-height: 1.4;
-  color: #374151;
+  color: #111827;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
+}
+
+.dlp-file-panel .file-message-copy strong {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .file-message-copy small,
 .dlp-mask-note {
   color: #6b7280;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .file-type-icon {
@@ -475,12 +585,41 @@
 }
 
 .file-message-card .file-type-icon {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
+}
+
+.file-message-card .attachment-view-button {
+  margin-left: auto;
+  background: transparent;
+  color: #4F46E5;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.file-message-card .attachment-view-button:hover {
+  color: #3730A3;
 }
 
 .dlp-mask-note {
-  margin-top: 8px !important;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+  border-radius: 4px;
+  background-color: #FEF3C7;
+  color: #D97706;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  text-align: center;
 }
 
 @keyframes assistant-error-in {
@@ -526,4 +665,3 @@
     transform: translateY(-4px);
   }
 }
-

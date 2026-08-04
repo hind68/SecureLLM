@@ -1,20 +1,32 @@
 ﻿/* App shell */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   background: #ffffff;
   color: #1f1f1f;
+  display: flex;
   overflow: hidden;
 }
 
 /* Main chat layout */
+.chat-workspace {
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex: 1;
+  margin-left: var(--sidebar-total-open-width);
+  overflow: hidden;
+  transition: margin-left 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
 .chat-main {
   position: relative;
+  flex: 1;
   min-width: 0;
   height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  margin-left: var(--sidebar-total-open-width);
-  transition: margin-left 240ms cubic-bezier(0.2, 0, 0, 1);
+  overflow: hidden;
+  transition: width 0.3s ease;
 }
 
 .drag-drop-overlay {
@@ -83,7 +95,7 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
-.sidebar-closed .chat-main {
+.sidebar-closed .chat-workspace {
   margin-left: var(--sidebar-closed-width);
 }
 

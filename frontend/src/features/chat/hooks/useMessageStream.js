@@ -96,7 +96,7 @@ export default function useMessageStream({
                     dlpHighestSeverity: parsed.highestSeverity,
                     dlpDetectedTypes: parsed.detectedTypes || [],
                     dlpMatches: parsed.matches || [],
-                    attachments: parsed.attachments || item.attachments || [],
+                    attachments: mergeAttachmentMetadata(parsed.attachments, item.attachments),
                   }
                 : item,
             )
@@ -219,7 +219,19 @@ export default function useMessageStream({
 function attachmentPreview(files) {
   return files.map((file) => ({
     filename: file.name,
+    file,
     mimeType: file.type || 'application/octet-stream',
     size: file.size,
   }))
+}
+
+function mergeAttachmentMetadata(serverAttachments = [], localAttachments = []) {
+  const localByName = new Map(
+    (localAttachments || []).map((attachment) => [attachment.filename || attachment.name, attachment]),
+  )
+  if (!Array.isArray(serverAttachments) || serverAttachments.length === 0) return localAttachments || []
+  return serverAttachments.map((attachment) => {
+    const local = localByName.get(attachment.filename || attachment.name)
+    return local?.file ? { ...attachment, file: local.file } : attachment
+  })
 }

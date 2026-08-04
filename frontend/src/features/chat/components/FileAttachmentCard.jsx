@@ -9,7 +9,7 @@ const FILE_ICON_META = {
   zip: '/assets/zip.png',
 }
 
-export default function FileAttachmentCard({ attachment, variant = 'message', onRemove }) {
+export default function FileAttachmentCard({ attachment, hideViewButton = false, variant = 'message', onInspect, onRemove }) {
   const filename = attachment?.filename || attachment?.name || 'Fichier'
   const size = attachment?.size || 0
 
@@ -41,6 +41,17 @@ export default function FileAttachmentCard({ attachment, variant = 'message', on
         <strong title={filename}>{filename}</strong>
         <small>{formatBytes(size)}</small>
       </span>
+      {onInspect && !hideViewButton && (
+        <button
+          className="attachment-view-button"
+          type="button"
+          aria-label={`Voir ${filename}`}
+          title={`Voir ${filename}`}
+          onClick={() => onInspect(attachment)}
+        >
+          Voir
+        </button>
+      )}
     </li>
   )
 }
