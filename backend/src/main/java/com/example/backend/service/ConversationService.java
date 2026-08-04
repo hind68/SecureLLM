@@ -58,6 +58,7 @@ public class ConversationService {
     private final LiteLlmService liteLlmService;
     private final DlpService dlpService;
     private final MessagePersistenceService messagePersistenceService;
+    private final AttachmentService attachmentService;
     private final int maxContextMessages;
 
     public ConversationService(
@@ -68,6 +69,7 @@ public class ConversationService {
             LiteLlmService liteLlmService,
             DlpService dlpService,
             MessagePersistenceService messagePersistenceService,
+            AttachmentService attachmentService,
             @Value("${gateway.context.max-messages:20}") int maxContextMessages
     ) {
         this.conversationRepository = conversationRepository;
@@ -77,6 +79,7 @@ public class ConversationService {
         this.liteLlmService = liteLlmService;
         this.dlpService = dlpService;
         this.messagePersistenceService = messagePersistenceService;
+        this.attachmentService = attachmentService;
         this.maxContextMessages = maxContextMessages;
     }
 
@@ -152,6 +155,7 @@ public class ConversationService {
         Conversation conversation = ownedConversation(id);
         Long conversationId = id;
         Utilisateur user = conversation.getUtilisateur();
+        attachmentService.deleteFilesForConversation(conversation);
         messageRepository.clearResponseLinksByConversationId(conversationId);
         messageRepository.deleteAllByConversationId(conversationId);
         messageRepository.flush();
@@ -207,7 +211,7 @@ public class ConversationService {
                 safeMessage = dlpService.safeMessageForLlm(content, files, conversation.getUtilisateur().getExternalId());
             }
         } catch (DlpBlockedException exception) {
-            persistBlockedUserMessage(conversation, content, exception);
+            persistBlockedUserMessage(conversation, content, files, exception);
             throw exception;
         }
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
@@ -219,7 +223,8 @@ public class ConversationService {
                 safeMessage.persistedContent(),
                 null
         ));
-        userMessage.setAttachmentMetadataJson(serializeAttachments(safeMessage.attachments()));
+        List<AttachmentMetadata> persistedAttachments = attachmentService.store(userMessage, files, safeMessage.attachments());
+        userMessage.setAttachmentMetadataJson(serializeAttachments(persistedAttachments));
 
         if ("Nouvelle conversation".equals(conversation.getTitre())) {
             conversation.rename(titleFrom(safeMessage.persistedContent()));
@@ -289,6 +294,15 @@ public class ConversationService {
         );
 
         return emitter;
+    }
+
+    @Transactional
+    public SseEmitter streamSecureAttachment(Long conversationId, Long attachmentId) {
+        String maskedText = attachmentService.maskedTextForConversationAttachment(attachmentId, conversationId);
+        if (maskedText.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Secure attachment content is empty");
+        }
+        return streamMessage(conversationId, maskedText, List.of());
     }
 
     private List<LiteLlmMessage> buildContext(Conversation conversation, Message safeMessage, String safeContent) {
@@ -366,7 +380,7 @@ public class ConversationService {
         );
     }
 
-    private void persistBlockedUserMessage(Conversation conversation, String content, DlpBlockedException exception) {
+    private void persistBlockedUserMessage(Conversation conversation, String content, List<MultipartFile> files, DlpBlockedException exception) {
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
         String maskedText = exception.getMaskedText() == null ? "" : exception.getMaskedText();
         Message userMessage = new Message(
@@ -383,8 +397,12 @@ public class ConversationService {
                 serializeDlpMatches(exception.getMatches()),
                 maskedText
         );
-        userMessage.setAttachmentMetadataJson(serializeAttachments(exception.getAttachments()));
-        messageRepository.save(userMessage);
+        Message persisted = messageRepository.save(userMessage);
+        if (persisted == null) {
+            persisted = userMessage;
+        }
+        List<AttachmentMetadata> persistedAttachments = attachmentService.store(persisted, files, exception.getAttachments());
+        persisted.setAttachmentMetadataJson(serializeAttachments(persistedAttachments));
         if ("Nouvelle conversation".equals(conversation.getTitre())) {
             conversation.rename(titleFromMasked(maskedText));
         }
@@ -416,7 +434,9 @@ public class ConversationService {
             return "";
         }
         return matches.stream()
-                .map(match -> encodeMatchField(match.type()) + "\t"
+                .map(match -> valueOrEmptyLong(match.attachmentId()) + "\t"
+                        + encodeMatchField(match.source()) + "\t"
+                        + encodeMatchField(match.type()) + "\t"
                         + valueOrEmpty(match.start()) + "\t"
                         + valueOrEmpty(match.end()) + "\t"
                         + valueOrEmpty(match.lineNumber()) + "\t"
@@ -429,7 +449,8 @@ public class ConversationService {
             return "";
         }
         return attachments.stream()
-                .map(attachment -> encodeMatchField(attachment.filename()) + "\t"
+                .map(attachment -> valueOrEmptyLong(attachment.id()) + "\t"
+                        + encodeMatchField(attachment.filename()) + "\t"
                         + encodeMatchField(attachment.mimeType()) + "\t"
                         + attachment.size() + "\t"
                         + encodeMatchField(attachment.decision()) + "\t"
@@ -451,17 +472,30 @@ public class ConversationService {
 
     private AttachmentMetadata parseAttachment(String line) {
         String[] parts = line.split("\\t", -1);
-        if (parts.length != 7) {
+        if (parts.length == 7) {
+            return new AttachmentMetadata(
+                    null,
+                    decodeMatchField(parts[0]),
+                    decodeMatchField(parts[1]),
+                    parseLong(parts[2]),
+                    decodeMatchField(parts[3]),
+                    parseInteger(parts[4]) == null ? 0 : parseInteger(parts[4]),
+                    parseInteger(parts[5]) == null ? 0 : parseInteger(parts[5]),
+                    decodeMatchField(parts[6])
+            );
+        }
+        if (parts.length != 8) {
             return null;
         }
         return new AttachmentMetadata(
-                decodeMatchField(parts[0]),
+                parseLongObject(parts[0]),
                 decodeMatchField(parts[1]),
-                parseLong(parts[2]),
-                decodeMatchField(parts[3]),
-                parseInteger(parts[4]) == null ? 0 : parseInteger(parts[4]),
+                decodeMatchField(parts[2]),
+                parseLong(parts[3]),
+                decodeMatchField(parts[4]),
                 parseInteger(parts[5]) == null ? 0 : parseInteger(parts[5]),
-                decodeMatchField(parts[6])
+                parseInteger(parts[6]) == null ? 0 : parseInteger(parts[6]),
+                decodeMatchField(parts[7])
         );
     }
 
@@ -477,15 +511,28 @@ public class ConversationService {
 
     private DlpPublicMatch parseDlpMatch(String line) {
         String[] parts = line.split("\\t", -1);
-        if (parts.length != 5) {
+        if (parts.length == 5) {
+            return new DlpPublicMatch(
+                    null,
+                    null,
+                    decodeMatchField(parts[0]),
+                    parseInteger(parts[1]),
+                    parseInteger(parts[2]),
+                    parseInteger(parts[3]),
+                    decodeMatchField(parts[4])
+            );
+        }
+        if (parts.length != 7) {
             return null;
         }
         return new DlpPublicMatch(
-                decodeMatchField(parts[0]),
-                parseInteger(parts[1]),
-                parseInteger(parts[2]),
+                parseLongObject(parts[0]),
+                decodeMatchField(parts[1]),
+                decodeMatchField(parts[2]),
                 parseInteger(parts[3]),
-                decodeMatchField(parts[4])
+                parseInteger(parts[4]),
+                parseInteger(parts[5]),
+                decodeMatchField(parts[6])
         );
     }
 
@@ -498,6 +545,10 @@ public class ConversationService {
     }
 
     private String valueOrEmpty(Integer value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String valueOrEmptyLong(Long value) {
         return value == null ? "" : String.valueOf(value);
     }
 
@@ -523,6 +574,17 @@ public class ConversationService {
         }
     }
 
+    private Long parseLongObject(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
     private void trySend(SseEmitter emitter, String event, Object value) {
         try {
             emitter.send(SseEmitter.event().name(event).data(value));
@@ -540,7 +602,7 @@ public class ConversationService {
                     blockedException.getHighestSeverity(),
                     blockedException.getMaskedText(),
                     blockedException.getMatches(),
-                    blockedException.getAttachments()
+                    blockedException.getAttachments().stream().map(attachment -> attachment.metadata(null)).toList()
             );
         }
         if (exception instanceof DlpUnavailableException) {

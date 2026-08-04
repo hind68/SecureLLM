@@ -75,6 +75,9 @@ class ConversationServiceTest {
     private MessagePersistenceService messagePersistenceService;
 
     @Mock
+    private AttachmentService attachmentService;
+
+    @Mock
     private Utilisateur demoUser;
 
     private ConversationService service;
@@ -97,6 +100,7 @@ class ConversationServiceTest {
                 liteLlmService,
                 dlpService,
                 messagePersistenceService,
+                attachmentService,
                 10
         );
         lenient().when(demoUser.getExternalId()).thenReturn("demo-user");
@@ -378,7 +382,7 @@ class ConversationServiceTest {
                         "HIGH",
                         Set.of("moroccan_cin"),
                         "Ma CIN est [MOROCCAN_CIN_1]",
-                        List.of(new com.example.backend.integration.dlp.DlpPublicMatch("moroccan_cin", 10, 18, 1, "[MOROCCAN_CIN_1]"))
+                        List.of(new com.example.backend.integration.dlp.DlpPublicMatch(null, null, "moroccan_cin", 10, 18, 1, "[MOROCCAN_CIN_1]"))
                 ));
 
         service.streamMessage(10L, new SendMessageRequest("Ma CIN est AB123456"));

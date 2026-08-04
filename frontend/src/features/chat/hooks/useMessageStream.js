@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { streamConversationMessage } from '../../../api/conversationsApi'
+import { streamSecureAttachment as streamSecureAttachmentRequest } from '../../../api/attachmentsApi'
 import { friendlyGenerationError } from '../../../utils/errors'
 import { dlpUserMessage } from '../utils/dlpErrors'
 import { extractSseData, parseJson } from '../utils/sse'
@@ -201,6 +202,89 @@ export default function useMessageStream({
     updateConversationMessages,
   ])
 
+  const streamSecureAttachment = useCallback(async (conversation, attachment) => {
+    if (!conversation?.id || !attachment?.id) return
+    const filename = attachment.filename || attachment.name || 'fichier'
+    const prompt = `Version sécurisée de ${filename}`
+    const modelName = modelDisplayName(conversation.modelAlias)
+    const localUserId = nextLocalId('local-user')
+    const localAssistantId = nextLocalId('local-assistant')
+    const abortController = new AbortController()
+    let finalConversationStatus = 'idle'
+    generationAbortRef.current = abortController
+    setConversationUiStatus(conversation.id, 'generating')
+
+    updateConversationMessages(conversation.id, (current) => [
+      ...current,
+      { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt, attachments: [attachment] },
+      {
+        id: localAssistantId,
+        role: 'ASSISTANT',
+        status: 'EN_COURS',
+        content: '',
+        modelAlias: conversation.modelAlias,
+        modelDisplayName: modelName,
+      },
+    ])
+
+    try {
+      const response = await streamSecureAttachmentRequest(conversation.id, attachment.id, abortController.signal)
+      if (!response.ok || !response.body) throw new Error('Erreur pendant le streaming LiteLLM')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+        events.forEach((rawEvent) => handleSseEvent(rawEvent, conversation.id, localUserId, localAssistantId))
+      }
+
+      if (buffer) {
+        handleSseEvent(buffer, conversation.id, localUserId, localAssistantId)
+      }
+      await loadConversations()
+      finalConversationStatus = getReadyConversationStatus(conversation.id)
+    } catch (error) {
+      if (abortController.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        updateConversationMessages(conversation.id, (current) =>
+          current
+            .map((item) => (item.id === localAssistantId ? { ...item, status: 'TERMINE' } : item))
+            .filter((item) => item.id !== localAssistantId || item.content.trim()),
+        )
+        return
+      }
+      const message = friendlyGenerationError(error)
+      updateConversationMessages(conversation.id, (current) =>
+        current.map((item) =>
+          item.id === localAssistantId ? { ...item, status: 'ECHEC', content: message } : item,
+        ),
+      )
+      if (activeConversationIdRef.current === conversation.id) showError(message)
+    } finally {
+      setConversationUiStatus(conversation.id, finalConversationStatus)
+      if (generationAbortRef.current === abortController) {
+        generationAbortRef.current = null
+      }
+      onStreamSettled?.()
+    }
+  }, [
+    activeConversationIdRef,
+    getReadyConversationStatus,
+    handleSseEvent,
+    loadConversations,
+    modelDisplayName,
+    nextLocalId,
+    onStreamSettled,
+    setConversationUiStatus,
+    showError,
+    updateConversationMessages,
+  ])
+
   const stopGeneration = useCallback(() => {
     generationAbortRef.current?.abort()
   }, [])
@@ -211,6 +295,7 @@ export default function useMessageStream({
 
   return {
     messageCacheRef,
+    streamSecureAttachment,
     streamMessage,
     stopGeneration,
   }

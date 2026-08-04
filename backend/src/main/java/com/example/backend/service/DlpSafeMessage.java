@@ -6,6 +6,6 @@ public record DlpSafeMessage(
         String safePrompt,
         String persistedContent,
         String highestSeverity,
-        List<AttachmentMetadata> attachments
+        List<DlpAttachmentAnalysis> attachments
 ) {
 }

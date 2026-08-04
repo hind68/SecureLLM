@@ -589,8 +589,16 @@
   height: 24px;
 }
 
-.file-message-card .attachment-view-button {
+.file-message-card .attachment-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.file-message-card .attachment-view-button {
   background: transparent;
   color: #4F46E5;
   font-size: 13px;

@@ -159,6 +159,7 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
     // TODO: Ouvrir le panneau latéral d'inspection de document.
     onInspectDocument?.({
       attachment: attachments[0],
+      mode: 'inspect',
       matches,
       maskedText: safeText,
     })
@@ -186,7 +187,7 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
       {hasDlpFiles ? (
         <section className="dlp-file-panel">
           <div className="dlp-file-inspection-row">
-            <AttachmentList attachments={attachments} hideViewButton onInspectDocument={onInspectDocument} />
+            <AttachmentList attachments={attachments} hideActions onInspectDocument={onInspectDocument} />
             <button type="button" className="dlp-inspect-button" onClick={handleInspectDocument}>
               Inspecter le document
             </button>
@@ -251,16 +252,17 @@ function displayableMessageContent(message) {
   return content
 }
 
-function AttachmentList({ attachments, hideViewButton = false, onInspectDocument }) {
+function AttachmentList({ attachments, hideActions = false, hideViewButton = false, onInspectDocument }) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null
   return (
     <ul className="message-attachments">
       {attachments.map((attachment, index) => (
         <FileAttachmentCard
           attachment={attachment}
+          hideActions={hideActions}
           hideViewButton={hideViewButton}
           key={`${attachment.filename || attachment.name}-${index}`}
-          onInspect={onInspectDocument}
+          onAction={(selectedAttachment, mode) => onInspectDocument?.({ attachment: selectedAttachment, mode })}
         />
       ))}
     </ul>

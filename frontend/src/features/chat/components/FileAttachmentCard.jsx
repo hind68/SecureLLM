@@ -9,7 +9,7 @@ const FILE_ICON_META = {
   zip: '/assets/zip.png',
 }
 
-export default function FileAttachmentCard({ attachment, hideViewButton = false, variant = 'message', onInspect, onRemove }) {
+export default function FileAttachmentCard({ attachment, hideActions = false, hideViewButton = false, variant = 'message', onAction, onInspect, onRemove }) {
   const filename = attachment?.filename || attachment?.name || 'Fichier'
   const size = attachment?.size || 0
 
@@ -41,19 +41,49 @@ export default function FileAttachmentCard({ attachment, hideViewButton = false,
         <strong title={filename}>{filename}</strong>
         <small>{formatBytes(size)}</small>
       </span>
-      {onInspect && !hideViewButton && (
-        <button
-          className="attachment-view-button"
-          type="button"
-          aria-label={`Voir ${filename}`}
-          title={`Voir ${filename}`}
-          onClick={() => onInspect(attachment)}
-        >
-          Voir
-        </button>
+      {!hideActions && (
+        <span className="attachment-actions">
+          {!hideViewButton && (
+            <button
+              className="attachment-view-button"
+              type="button"
+              aria-label={`Voir ${filename}`}
+              title={`Voir ${filename}`}
+              onClick={() => emitAction(onAction, onInspect, attachment, 'view')}
+            >
+              Voir
+            </button>
+          )}
+          <button
+            className="attachment-view-button"
+            type="button"
+            aria-label={`Inspecter ${filename}`}
+            title={`Inspecter ${filename}`}
+            onClick={() => emitAction(onAction, onInspect, attachment, 'inspect')}
+          >
+            Inspecter
+          </button>
+          <button
+            className="attachment-view-button"
+            type="button"
+            aria-label={`Afficher la version sécurisée de ${filename}`}
+            title={`Version sécurisée de ${filename}`}
+            onClick={() => emitAction(onAction, onInspect, attachment, 'secure')}
+          >
+            Version sécurisée
+          </button>
+        </span>
       )}
     </li>
   )
+}
+
+function emitAction(onAction, onInspect, attachment, mode) {
+  if (onAction) {
+    onAction(attachment, mode)
+    return
+  }
+  onInspect?.({ attachment, mode })
 }
 
 function getFileIcon(filename, size = 32) {

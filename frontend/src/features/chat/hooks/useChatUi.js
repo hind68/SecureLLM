@@ -59,6 +59,7 @@ export default function useChatUi({
   const {
     messageCacheRef,
     stopGeneration,
+    streamSecureAttachment,
     streamMessage,
   } = useMessageStream({
     activeConversationIdRef,
@@ -229,6 +230,7 @@ export default function useChatUi({
     rememberComposerFocusIntent,
     restoreComposerFocusSoon,
     stopGeneration,
+    streamSecureAttachment,
     streamMessage,
     removeAttachment,
     textareaRef,

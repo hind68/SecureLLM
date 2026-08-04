@@ -223,8 +223,10 @@ export default function AppLayout({
       {inspectedDocument && (
         <DocumentInspectorPanel
           attachment={inspectedDocument}
-          key={`${inspectedDocument.filename || inspectedDocument.name}-${inspectedDocument.size || 0}`}
+          conversationId={activeConversation?.id}
+          key={`${inspectedDocument.attachment?.id || inspectedDocument.id || inspectedDocument.attachment?.filename || inspectedDocument.filename || inspectedDocument.name}-${inspectedDocument.mode || 'view'}`}
           onClose={() => setInspectedDocument(null)}
+          onSendSecure={(attachment) => activeConversation && chat.streamSecureAttachment(activeConversation, attachment)}
         />
       )}
       </div>

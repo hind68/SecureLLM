@@ -2,7 +2,7 @@ package com.example.backend.integration.dlp;
 
 import java.util.Set;
 import java.util.List;
-import com.example.backend.service.AttachmentMetadata;
+import com.example.backend.service.DlpAttachmentAnalysis;
 
 public class DlpBlockedException extends DlpAnalysisException {
 
@@ -10,7 +10,7 @@ public class DlpBlockedException extends DlpAnalysisException {
     private final Set<String> detectedTypes;
     private final String maskedText;
     private final List<DlpPublicMatch> matches;
-    private final List<AttachmentMetadata> attachments;
+    private final List<DlpAttachmentAnalysis> attachments;
 
     public DlpBlockedException(String highestSeverity, Set<String> detectedTypes) {
         this(highestSeverity, detectedTypes, null, List.of());
@@ -20,7 +20,7 @@ public class DlpBlockedException extends DlpAnalysisException {
         this(highestSeverity, detectedTypes, maskedText, matches, List.of());
     }
 
-    public DlpBlockedException(String highestSeverity, Set<String> detectedTypes, String maskedText, List<DlpPublicMatch> matches, List<AttachmentMetadata> attachments) {
+    public DlpBlockedException(String highestSeverity, Set<String> detectedTypes, String maskedText, List<DlpPublicMatch> matches, List<DlpAttachmentAnalysis> attachments) {
         super("Message blocked by DLP policy");
         this.highestSeverity = highestSeverity;
         this.detectedTypes = detectedTypes == null ? Set.of() : Set.copyOf(detectedTypes);
@@ -45,7 +45,7 @@ public class DlpBlockedException extends DlpAnalysisException {
         return matches;
     }
 
-    public List<AttachmentMetadata> getAttachments() {
+    public List<DlpAttachmentAnalysis> getAttachments() {
         return attachments;
     }
 }

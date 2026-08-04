@@ -100,8 +100,14 @@
   border-bottom-color: #4F46E5;
 }
 
-.document-inspector-tabs .document-copy-safe {
+.document-secure-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-inspector-tabs .document-copy-safe {
   border: 1px solid #E5E7EB;
   border-radius: 6px;
   color: #4F46E5;
@@ -113,6 +119,11 @@
 .document-inspector-tabs .document-copy-safe:hover {
   background: #F9FAFB;
   border-color: #C7D2FE;
+}
+
+.document-inspector-tabs .document-copy-safe:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .document-inspector-viewer {
@@ -159,7 +170,8 @@
   margin: 0 auto;
 }
 
-.document-secure-text {
+.document-secure-text,
+.document-inspection-text {
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
@@ -172,6 +184,11 @@
   line-height: 1.6;
   padding: 32px;
   white-space: pre-wrap;
+}
+
+.document-inspection-text {
+  background: #FFFFFF;
+  color: #111827;
 }
 
 .document-a4-page p {

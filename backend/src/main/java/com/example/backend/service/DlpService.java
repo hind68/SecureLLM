@@ -48,7 +48,7 @@ public class DlpService {
                     response.highestSeverity(),
                     detectedTypes(response),
                     response.maskedText(),
-                    publicMatches(text, response.matches())
+                    publicMatches(null, "message", text, response.matches())
             );
         }
 
@@ -71,7 +71,7 @@ public class DlpService {
         DlpMultiSourceAnalysisResponse response = dlpClient.analyseMessage(normalizedText, safeFiles, userId);
         validateMultiSourceResponse(response);
 
-        List<AttachmentMetadata> attachments = attachmentMetadata(response, safeFiles);
+        List<DlpAttachmentAnalysis> attachments = attachmentAnalyses(response, safeFiles);
         if (response.status() == null || !SUCCESS_STATUS.equalsIgnoreCase(response.status()) || response.decision() == DlpDecision.BLOCK) {
             throw new DlpBlockedException(
                     response.highestSeverity(),
@@ -141,12 +141,14 @@ public class DlpService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private List<DlpPublicMatch> publicMatches(String text, List<DlpMatch> matches) {
+    private List<DlpPublicMatch> publicMatches(Long attachmentId, String source, String text, List<DlpMatch> matches) {
         if (matches == null || matches.isEmpty()) {
             return List.of();
         }
         return matches.stream()
                 .map(match -> new DlpPublicMatch(
+                        attachmentId,
+                        source,
                         match.type(),
                         match.start(),
                         match.end(),
@@ -162,29 +164,34 @@ public class DlpService {
         }
         List<DlpPublicMatch> matches = new ArrayList<>();
         for (DlpSourceResult result : response.results()) {
-            String text = result.maskedText() == null ? "" : result.maskedText();
-            matches.addAll(publicMatches(text, result.matches()));
+            String text = result.extractedText() == null ? "" : result.extractedText();
+            matches.addAll(publicMatches(null, result.source(), text, result.matches()));
         }
         return matches;
     }
 
-    private List<AttachmentMetadata> attachmentMetadata(DlpMultiSourceAnalysisResponse response, List<MultipartFile> files) {
+    private List<DlpAttachmentAnalysis> attachmentAnalyses(DlpMultiSourceAnalysisResponse response, List<MultipartFile> files) {
         List<DlpSourceResult> results = response.results() == null ? List.of() : response.results();
-        List<AttachmentMetadata> metadata = new ArrayList<>();
+        List<DlpAttachmentAnalysis> metadata = new ArrayList<>();
         for (MultipartFile file : files) {
             String filename = sanitizeFilename(file.getOriginalFilename());
             DlpSourceResult result = findSource(results, filename);
             String maskedText = result == null || result.maskedText() == null ? "" : result.maskedText();
+            String extractedText = result == null || result.extractedText() == null ? "" : result.extractedText();
             String decision = result == null || result.decision() == null ? "BLOCK" : result.decision().name();
             String status = result == null ? "ERROR" : result.status();
-            metadata.add(new AttachmentMetadata(
+            metadata.add(new DlpAttachmentAnalysis(
+                    result == null ? filename : result.source(),
                     filename,
                     safeMimeType(file.getContentType()),
                     file.getSize(),
                     decision,
                     maskedText.length(),
                     estimateTokens(maskedText.length()),
-                    status
+                    status,
+                    extractedText,
+                    maskedText,
+                    publicMatches(null, result == null ? filename : result.source(), extractedText, result == null ? List.of() : result.matches())
             ));
         }
         return metadata;
@@ -243,7 +250,7 @@ public class DlpService {
                 .sum();
     }
 
-    private String persistedBlockedText(DlpMultiSourceAnalysisResponse response, List<AttachmentMetadata> attachments) {
+    private String persistedBlockedText(DlpMultiSourceAnalysisResponse response, List<DlpAttachmentAnalysis> attachments) {
         String safeMessageText = sourceText(response.results(), "message");
         if (!safeMessageText.isBlank()) {
             return safeMessageText;
@@ -251,12 +258,12 @@ public class DlpService {
         return attachmentSummary(attachments);
     }
 
-    private String attachmentSummary(List<AttachmentMetadata> attachments) {
+    private String attachmentSummary(List<DlpAttachmentAnalysis> attachments) {
         if (attachments == null || attachments.isEmpty()) {
             return "";
         }
         return attachments.stream()
-                .map(AttachmentMetadata::filename)
+                .map(DlpAttachmentAnalysis::filename)
                 .collect(Collectors.joining(", ", "Pieces jointes: ", ""));
     }
 

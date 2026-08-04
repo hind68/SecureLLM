@@ -77,7 +77,7 @@ class DlpServiceTest {
     @Test
     void invalidDlpStatusFailsClosed() {
         when(dlpClient.analyse("hello", "demo-user"))
-                .thenReturn(new DlpAnalysisResponse("ERROR", DlpDecision.ALLOW, false, null, "hello", List.of(), List.of()));
+                .thenReturn(new DlpAnalysisResponse("ERROR", DlpDecision.ALLOW, false, null, "hello", "hello", List.of(), List.of()));
 
         assertThatThrownBy(() -> dlpService.safeTextForLlm("hello", "demo-user"))
                 .isInstanceOf(DlpUnavailableException.class);
@@ -149,10 +149,10 @@ class DlpServiceTest {
     }
 
     private DlpAnalysisResponse response(DlpDecision decision, String maskedText, List<DlpMatch> matches) {
-        return new DlpAnalysisResponse("SUCCESS", decision, false, "HIGH", maskedText, matches, List.of());
+        return new DlpAnalysisResponse("SUCCESS", decision, false, "HIGH", maskedText, maskedText, matches, List.of());
     }
 
     private DlpSourceResult source(String source, DlpDecision decision, String maskedText, List<DlpMatch> matches) {
-        return new DlpSourceResult(source, "SUCCESS", decision, !matches.isEmpty(), null, maskedText, matches, List.of());
+        return new DlpSourceResult(source, "SUCCESS", decision, !matches.isEmpty(), null, maskedText, maskedText, matches, List.of());
     }
 }
