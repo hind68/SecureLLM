@@ -345,17 +345,20 @@ function InspectionDocumentView({ state }) {
   const rows = lineRows(state.text, highlightableMatches)
   function selectMatch(match) {
     const id = matchKey(match)
+    const line = lineNumberForMatch(state.text, match)
     setSelectedMatchId(id)
-    document.querySelector(`[data-match-id="${CSS.escape(id)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+    const lineElement = Number.isInteger(line) ? document.getElementById(`line-${line}`) : null
+    const matchElement = document.querySelector(`[data-match-id="${CSS.escape(id)}"]`)
+    ;(lineElement || matchElement)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
     window.setTimeout(() => setSelectedMatchId((current) => (current === id ? '' : current)), 1400)
   }
 
   return (
     <div className="document-detected-layout">
       <DetectionIndex matches={highlightableMatches} text={state.text} onSelect={selectMatch} />
-      <div className="document-inspection-code">
+      <div className="document-inspection-code flex-1 min-h-0 overflow-y-auto">
         {rows.map((line) => (
-          <div className="document-line" key={line.number}>
+          <div className="document-line" id={`line-${line.number}`} key={line.number}>
             <span className="document-line-number">{line.number}</span>
             <code>{renderHighlightedParts(line.parts, selectedMatchId)}</code>
           </div>
@@ -417,15 +420,15 @@ function EditorText({ text, className, renderLine = (line) => line }) {
 function DetectionIndex({ matches, text, onSelect }) {
   if (!Array.isArray(matches) || matches.length === 0) return null
   return (
-    <div className="document-threat-list" aria-label="Liste des menaces détectées">
+    <div className="document-threat-list max-h-32 overflow-y-auto shrink-0" aria-label="Liste des menaces détectées">
       {matches.map((match, index) => {
         const id = matchKey(match)
+        const severity = severityClass(match)
         return (
-          <button type="button" key={`${id}-${index}`} data-target-match-id={id} onClick={() => onSelect(match)}>
+          <button type="button" className={`document-threat-pill severity-${severity}`} key={`${id}-${index}`} data-target-match-id={id} onClick={() => onSelect(match)}>
             <strong>{displaySeverity(match.severity)}</strong>
             <span>{displayTypeFr(match.type)}</span>
             <small>Ligne {lineNumberForMatch(text, match)}</small>
-            <em>{contextForMatch(text, match)}</em>
           </button>
         )
       })}
@@ -620,16 +623,6 @@ function renderSecureText(text) {
   return parts
 }
 
-function contextForMatch(text, match) {
-  const value = String(text || '')
-  if (!Number.isInteger(match?.start) || !Number.isInteger(match?.end) || !value) return match?.placeholder || ''
-  const line = lineTextForOffset(value, match.start)
-  if (line.length <= 180) return line
-  const localStart = Math.max(0, match.start - line.start)
-  const start = Math.max(0, localStart - 60)
-  return `${start > 0 ? '...' : ''}${line.text.slice(start, start + 180)}${start + 180 < line.text.length ? '...' : ''}`
-}
-
 function lineNumberForMatch(text, match) {
   const value = String(text || '')
   if (Number.isInteger(match?.start)) {
@@ -640,15 +633,6 @@ function lineNumberForMatch(text, match) {
   }
   if (Number.isInteger(match?.lineNumber) && match.lineNumber > 0) return match.lineNumber
   return 'inconnue'
-}
-
-function lineTextForOffset(text, offset) {
-  const value = String(text || '')
-  const bounded = Math.max(0, Math.min(offset, value.length))
-  const start = value.lastIndexOf('\n', bounded - 1) + 1
-  const nextBreak = value.indexOf('\n', bounded)
-  const end = nextBreak === -1 ? value.length : nextBreak
-  return { start, text: value.slice(start, end) }
 }
 
 function isTextLike(extension, contentType = '') {

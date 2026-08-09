@@ -1905,3 +1905,119 @@
   vertical-align: top;
 }
 
+/* Compact threat navigation pills */
+.document-detected-page,
+.document-detected-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.document-detected-layout {
+  flex: 1 1 auto;
+  height: 100%;
+  gap: 0;
+}
+
+.document-threat-list {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  padding: 16px;
+}
+
+.document-threat-list button,
+.document-threat-list .document-threat-pill {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: none;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #FDE68A;
+  border-radius: 999px;
+  background: #FFFBEB;
+  color: #B45309;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 6px 12px;
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.document-threat-list button:hover,
+.document-threat-list .document-threat-pill:hover {
+  background: #FEF3C7;
+}
+
+.document-threat-list .document-threat-pill.severity-high {
+  border-color: #FECACA;
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.document-threat-list .document-threat-pill.severity-high:hover {
+  background: #FEE2E2;
+}
+
+.document-threat-list .document-threat-pill strong,
+.document-threat-list .document-threat-pill span,
+.document-threat-list .document-threat-pill small {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-threat-list .document-threat-pill strong {
+  font-weight: 650;
+}
+
+.document-threat-list .document-threat-pill small {
+  opacity: 0.78;
+}
+
+.document-inspection-code {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #FFFFFF;
+  overflow-y: auto;
+}
+
+.document-dlp-mark,
+.document-dlp-mark.severity-low,
+.document-dlp-mark.severity-medium,
+.document-dlp-mark.severity-high {
+  border: 1px solid #FDE68A;
+  border-radius: 4px;
+  background: rgba(254, 243, 199, 0.5);
+  color: #78350F;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.document-dlp-mark {
+  border: 1px solid #FDE68A;
+  border-radius: 4px;
+  background: rgba(254, 243, 199, 0.5);
+  color: #78350F;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
