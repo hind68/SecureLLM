@@ -217,8 +217,10 @@ describe('ChatMessage', () => {
     expect(html).toContain('aria-selected="true"')
     expect(html).toContain('Ligne 2')
     expect(html).toContain('Ligne 3')
-    expect(html).toContain('Token sk-test-secret')
-    expect(html).toContain('Email admin@example.com')
+    expect(html).toContain('Token ')
+    expect(html).toContain('sk-test-secret')
+    expect(html).toContain('Email ')
+    expect(html).toContain('admin@example.com')
   })
 
   it('calculates threat lines from extracted text offsets and wires cards to highlights', () => {
@@ -256,9 +258,17 @@ describe('ChatMessage', () => {
       />,
     )
 
+    expect(html).toContain('L3')
+    expect(html).toContain('L8')
+    expect(html).toContain('L15')
     expect(html).toContain('Ligne 3')
     expect(html).toContain('Ligne 8')
     expect(html).toContain('Ligne 15')
+    expect(html).toContain('document-threat-navigation shrink-0')
+    expect(html).toContain('document-threat-list max-h-32 overflow-y-auto shrink-0 is-collapsed')
+    expect(html).toContain('Toutes')
+    expect(html).toContain('\u00c9lev\u00e9es')
+    expect(html).not.toContain('Voir les autres')
     expect(html).not.toContain('Ligne 1</small>')
     expect(html).toContain('data-target-match-id="email_1"')
     expect(html).toContain('data-match-id="email_1"')
@@ -269,6 +279,54 @@ describe('ChatMessage', () => {
     expect(html).toContain('data-target-match-id="moroccan_cin_1"')
     expect(html).toContain('data-match-id="moroccan_cin_1"')
     expect(html).toContain('id="line-15"')
+  })
+
+  it('keeps many threat chips compact with summary filters and an expand action', () => {
+    const lines = Array.from({ length: 22 }, (_, index) => `line ${index + 1} secret-${index + 1}`)
+    const text = lines.join('\n')
+    const matches = lines.map((line, index) => {
+      const value = `secret-${index + 1}`
+      const start = text.indexOf(value)
+      return {
+        id: `threat_${index + 1}`,
+        attachmentId: 12,
+        source: 'multiline.txt',
+        type: index < 18 ? 'openai_api_key' : 'email',
+        start,
+        end: start + value.length,
+        lineNumber: 1,
+        severity: index < 18 ? 'high' : 'medium',
+        placeholder: `[THREAT_${index + 1}]`,
+      }
+    })
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'many.txt', decision: 'BLOCK' },
+          extractedText: text,
+          requestedView: 'detected',
+          matches,
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('22 menaces d\u00e9tect\u00e9es')
+    expect(html).toContain('18 \u00e9lev\u00e9es')
+    expect(html).toContain('4 moyennes')
+    expect(html).toContain('Toutes')
+    expect(html).toContain('\u00c9lev\u00e9es')
+    expect(html).toContain('Moyennes')
+    expect(html).toContain('Voir les autres')
+    expect(html).toContain('document-threat-list max-h-32 overflow-y-auto shrink-0 is-collapsed')
+    expect(html).toContain('document-inspection-code flex-1 min-h-0 overflow-y-auto')
+    expect((html.match(/data-target-match-id=/g) || [])).toHaveLength(6)
+    expect(html).toContain('document-header-tabs')
+    expect(html).toContain('document-text-size-trigger')
+    expect(html).toContain('Aa')
+    expect(html).not.toContain('A-')
+    expect(html).not.toContain('A+')
+    expect(html).not.toContain('document-segmented-row')
   })
 
   it('shows unknown line instead of silently falling back to line one', () => {
@@ -326,7 +384,7 @@ describe('ChatMessage', () => {
     )
 
     expect(html).toContain('Localisation indisponible')
-    expect(html).not.toContain('Extraction rÃ©ussie, mais aucun texte lisible')
+    expect(html).not.toContain('Extraction r\u00e9ussie, mais aucun texte lisible')
   })
 
   it('renders the file secure version placeholders instead of attachment summary text', () => {
@@ -361,18 +419,28 @@ describe('ChatMessage', () => {
     expect(cssRule(panelsCss, '.document-original-code')).toMatch(/scrollbar-width:\s*thin;/)
     expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/position:\s*absolute;/)
     expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/bottom:\s*0;/)
-    expect(cssRule(panelsCss, '.document-zoom-controls')).toMatch(/display:\s*flex;/)
-    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/display:\s*flex;/)
-    expect(cssRule(panelsCss, '.document-segmented-row .segmented-control button')).toMatch(/white-space:\s*nowrap;/)
-    expect(cssRule(panelsCss, '.document-segmented-row > .segmented-control')).toMatch(/flex-shrink:\s*0;/)
-    expect(cssRule(panelsCss, '.document-segmented-row > .segmented-control')).toMatch(/gap:\s*4px;/)
+    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/display:\s*none !important;/)
+    expect(cssRule(panelsCss, '.document-inspector-header')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto\s*auto;/)
+    expect(cssRule(panelsCss, '.document-header-tabs')).toMatch(/justify-self:\s*end;/)
+    expect(cssRule(panelsCss, '.document-text-size-popover')).toMatch(/position:\s*absolute;/)
     expect(cssRule(panelsCss, '.document-inspector-header .document-close-button')).toMatch(/border-radius:\s*999px;/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/background:\s*rgba\(254,\s*243,\s*199,\s*0\.5\);/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/color:\s*#78350F;/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/font-weight:\s*600;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/max-height:\s*8rem;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/overflow-y:\s*auto;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/overflow-x:\s*hidden;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).not.toMatch(/border-bottom:/)
+    expect(cssRule(panelsCss, '.document-threat-list .document-threat-pill.is-active')).not.toMatch(/0F766E|118,\s*110/)
+    expect(cssRule(panelsCss, '.document-dlp-mark.is-selected')).not.toMatch(/0F766E|118,\s*110/)
+    expect(cssRule(panelsCss, '.document-dlp-mark.is-selected')).toMatch(/outline:\s*none;/)
+    expect(cssRule(panelsCss, '.document-inspection-code')).toMatch(/flex:\s*1 1 auto;/)
+    expect(cssRule(panelsCss, '.document-inspection-code')).toMatch(/min-height:\s*0;/)
     expect(cssRule(panelsCss, '.document-line code')).not.toMatch(/word-break:\s*break-all;/)
-    expect(inspectorSource).toContain('useState(13)')
+    expect(inspectorSource).toContain('READER_FONT_SIZE = 13')
+    expect(inspectorSource).not.toContain('document-zoom-controls')
     expect(inspectorSource).not.toContain('scale(')
+    expect(panelsCss).not.toContain('document-zoom-controls')
     expect(inspectorSource).toContain('fetchAttachmentContent')
     expect(inspectorSource).toContain('fetchAttachmentInspection')
     expect(inspectorSource).toContain('fetchAttachmentSecure')
@@ -388,19 +456,18 @@ describe('ChatMessage', () => {
     const markdownCss = readFileSync(new URL('../../../styles/markdown.css', import.meta.url), 'utf8')
 
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/width:\s*min\(var\(--assistant-content-width\),\s*calc\(100% - 36px\)\);/)
-    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/width:\s*fit-content;/)
-    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
-    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/border-radius:\s*2px 16px 16px 16px;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/width:\s*fit-content;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/width:\s*fit-content;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/margin-left:\s*auto;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).not.toMatch(/width:\s*100%;/)
+    expect(cssRule(chatCss, '.messages')).toMatch(/padding-bottom:\s*136px;/)
     expect(cssRule(chatCss, '.go-bottom-button')).toMatch(/left:\s*50%;/)
+    expect(cssRule(chatCss, '.go-bottom-button')).toMatch(/bottom:\s*132px;/)
     expect(cssRule(chatCss, '.go-bottom-button')).not.toMatch(/right:\s*32px;/)
     expect(cssRule(markdownCss, '.markdown-body')).toMatch(/overflow:\s*hidden;/)
     expect(cssRule(markdownCss, '.markdown-body')).toMatch(/overflow-wrap:\s*break-word;/)
-    expect(cssRule(markdownCss, '.markdown-body')).toMatch(/white-space:\s*pre-wrap;/)
+    expect(cssRule(markdownCss, '.markdown-body')).toMatch(/white-space:\s*normal;/)
   })
 
   it('counts five current attachment matches in the viewer', () => {

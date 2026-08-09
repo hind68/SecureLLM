@@ -16,6 +16,8 @@ const TEXT_LIKE_EXTENSIONS = new Set([
   '.properties',
   '.env',
 ].map((extension) => extension.slice(1)))
+const READER_FONT_SIZE = 13
+const COMPACT_THREAT_LIMIT = 6
 const PREVIEW_UNAVAILABLE = 'Format non prévisualisable'
 const EXTRACTION_UNAVAILABLE = 'Extraction impossible'
 
@@ -28,7 +30,8 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
   const [inspectionState, setInspectionState] = useState(() => initialInspectionState(target))
   const [secureState, setSecureState] = useState(() => initialSecureState(target))
   const [copySucceeded, setCopySucceeded] = useState(false)
-  const [fontSize, setFontSize] = useState(13)
+  const [fontSize, setFontSize] = useState(READER_FONT_SIZE)
+  const [showTextSizeMenu, setShowTextSizeMenu] = useState(false)
 
   useEffect(() => {
     setActiveTab(initialMode(target))
@@ -36,7 +39,8 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
     setInspectionState(initialInspectionState(target))
     setSecureState(initialSecureState(target))
     setCopySucceeded(false)
-    setFontSize(13)
+    setFontSize(READER_FONT_SIZE)
+    setShowTextSizeMenu(false)
   }, [attachmentKey])
 
   useEffect(() => {
@@ -218,15 +222,36 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
           <strong title={filename}>{filename}</strong>
           <span>{extension}</span>
         </div>
+        <div className="segmented-control document-header-tabs" role="tablist" aria-label="Vues du document">
+          <button type="button" role="tab" aria-selected={activeTab === 'original'} className={activeTab === 'original' ? 'active' : ''} onClick={() => setActiveTab('original')}>
+            Original
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'detected'} className={activeTab === 'detected' ? 'active' : ''} onClick={() => setActiveTab('detected')}>
+            Menaces ({matchCount})
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'secure'} className={activeTab === 'secure' ? 'active' : ''} onClick={() => setActiveTab('secure')}>
+            Sécurisé
+          </button>
+        </div>
         <div className="document-inspector-header-actions">
-          <div className="document-zoom-controls" aria-label="Taille du texte">
-            <button type="button" className="document-zoom-button document-type-button" aria-label="Réduire la taille du texte" title="Réduire la taille du texte" onClick={decreaseFontSize}>
-              A-
+          <div className="document-text-size-control">
+            <button
+              type="button"
+              className="document-header-icon-action document-text-size-trigger"
+              aria-expanded={showTextSizeMenu}
+              aria-label="Modifier la taille du texte"
+              title="Taille du texte"
+              onClick={() => setShowTextSizeMenu((current) => !current)}
+            >
+              Aa
             </button>
-            <span className="document-zoom-value" aria-label="Taille actuelle du texte">{fontSize}px</span>
-            <button type="button" className="document-zoom-button document-type-button" aria-label="Agrandir la taille du texte" title="Agrandir la taille du texte" onClick={increaseFontSize}>
-              A+
-            </button>
+            {showTextSizeMenu && (
+              <div className="document-text-size-popover" role="dialog" aria-label="Taille du texte">
+                <button type="button" aria-label="Réduire la taille du texte" onClick={decreaseFontSize}>A-</button>
+                <span>{fontSize} px</span>
+                <button type="button" aria-label="Agrandir la taille du texte" onClick={increaseFontSize}>A+</button>
+              </div>
+            )}
           </div>
           {canDownloadOriginal && (
             <a className="document-header-icon-action" href={`/api/attachments/${attachment.id}/content`} download aria-label="Télécharger le fichier original" title="Télécharger le fichier original">
@@ -238,20 +263,6 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
           </button>
         </div>
       </header>
-
-      <div className="document-segmented-row">
-        <div className="segmented-control" role="tablist" aria-label="Vues du document">
-          <button type="button" role="tab" aria-selected={activeTab === 'original'} className={activeTab === 'original' ? 'active' : ''} onClick={() => setActiveTab('original')}>
-            Original
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'detected'} className={activeTab === 'detected' ? 'active' : ''} onClick={() => setActiveTab('detected')}>
-            Menaces ({matchCount})
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'secure'} className={activeTab === 'secure' ? 'active' : ''} onClick={() => setActiveTab('secure')}>
-            Sécurisé
-          </button>
-        </div>
-      </div>
 
       <div className="document-inspector-viewer">
         <div className="document-zoom-shell">
@@ -324,7 +335,7 @@ function InspectionDocumentView({ state }) {
     return (
       <DetectionIssueState
         matches={state.matches}
-        message="Le DLP a detecte des donnees sensibles, mais le texte extrait n'a pas ete conserve pour localiser les positions."
+        message="Le DLP a détecté des données sensibles, mais le texte extrait n'a pas été conservé pour localiser les positions."
       />
     )
   }
@@ -336,7 +347,7 @@ function InspectionDocumentView({ state }) {
     return (
       <DetectionIssueState
         matches={state.matches}
-        message="Le DLP a detecte des donnees sensibles, mais leurs positions ne correspondent pas au texte extrait affichable."
+        message="Le DLP a détecté des données sensibles, mais leurs positions ne correspondent pas au texte extrait affichable."
         text={state.text}
       />
     )
@@ -350,17 +361,16 @@ function InspectionDocumentView({ state }) {
     const lineElement = Number.isInteger(line) ? document.getElementById(`line-${line}`) : null
     const matchElement = document.querySelector(`[data-match-id="${CSS.escape(id)}"]`)
     ;(lineElement || matchElement)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-    window.setTimeout(() => setSelectedMatchId((current) => (current === id ? '' : current)), 1400)
   }
 
   return (
     <div className="document-detected-layout">
-      <DetectionIndex matches={highlightableMatches} text={state.text} onSelect={selectMatch} />
+      <DetectionIndex matches={highlightableMatches} selectedMatchId={selectedMatchId} text={state.text} onSelect={selectMatch} />
       <div className="document-inspection-code flex-1 min-h-0 overflow-y-auto">
         {rows.map((line) => (
           <div className="document-line" id={`line-${line.number}`} key={line.number}>
             <span className="document-line-number">{line.number}</span>
-            <code>{renderHighlightedParts(line.parts, selectedMatchId)}</code>
+            <code>{renderHighlightedParts(line.parts, selectedMatchId, selectMatch)}</code>
           </div>
         ))}
       </div>
@@ -374,7 +384,7 @@ function DetectionIssueState({ matches, message, text = '' }) {
       <span aria-hidden="true">!</span>
       <strong>Localisation indisponible</strong>
       <p>{message}</p>
-      <DetectionIndex matches={matches} text={text} onSelect={() => undefined} />
+      <DetectionIndex matches={matches} selectedMatchId="" text={text} onSelect={() => undefined} />
     </div>
   )
 }
@@ -417,25 +427,66 @@ function EditorText({ text, className, renderLine = (line) => line }) {
   )
 }
 
-function DetectionIndex({ matches, text, onSelect }) {
+function DetectionIndex({ matches, selectedMatchId, text, onSelect }) {
+  const [expanded, setExpanded] = useState(false)
+  const [filter, setFilter] = useState('all')
   if (!Array.isArray(matches) || matches.length === 0) return null
+  const counts = severityCounts(matches)
+  const filters = threatFilters(counts)
+  const visibleMatches = filter === 'all' ? matches : matches.filter((match) => severityGroup(match) === filter)
+  const visibleChips = expanded ? visibleMatches : visibleMatches.slice(0, COMPACT_THREAT_LIMIT)
+  const canExpand = visibleMatches.length > COMPACT_THREAT_LIMIT
   return (
-    <div className="document-threat-list max-h-32 overflow-y-auto shrink-0" aria-label="Liste des menaces détectées">
-      {matches.map((match, index) => {
-        const id = matchKey(match)
-        const severity = severityClass(match)
-        return (
-          <button type="button" className={`document-threat-pill severity-${severity}`} key={`${id}-${index}`} data-target-match-id={id} onClick={() => onSelect(match)}>
-            <strong>{displaySeverity(match.severity)}</strong>
-            <span>{displayTypeFr(match.type)}</span>
-            <small>Ligne {lineNumberForMatch(text, match)}</small>
-          </button>
-        )
-      })}
+    <div className="document-threat-navigation shrink-0" aria-label="Liste des menaces détectées">
+      <div className="document-threat-summary">
+        <strong>{threatSummary(counts)}</strong>
+        <div className="document-threat-filters" aria-label="Filtres des menaces">
+          {filters.map((item) => (
+            <button
+              type="button"
+              className={filter === item.key ? 'active' : ''}
+              key={item.key}
+              onClick={() => {
+                setFilter(item.key)
+                setExpanded(false)
+              }}
+            >
+              {item.label} <span>{item.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={`document-threat-list max-h-32 overflow-y-auto shrink-0 ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
+        {visibleChips.map((match, index) => {
+          const id = matchKey(match)
+          const severity = severityClass(match)
+          const line = lineNumberForMatch(text, match)
+          const lineLabel = Number.isInteger(line) ? `L${line}` : 'L?'
+          const fullLineLabel = Number.isInteger(line) ? `Ligne ${line}` : 'Ligne inconnue'
+          return (
+            <button
+              type="button"
+              aria-label={`${displaySeverity(match.severity)} ${displayTypeFr(match.type)} ${fullLineLabel}`}
+              className={`document-threat-pill severity-${severity} ${selectedMatchId === id ? 'is-active' : ''}`}
+              key={`${id}-${index}`}
+              data-target-match-id={id}
+              onClick={() => onSelect(match)}
+              title={`${displaySeverity(match.severity)} - ${displayTypeFr(match.type)} - ${fullLineLabel}`}
+            >
+              <span>{displayTypeFr(match.type)}</span>
+              <small title={fullLineLabel}>{lineLabel}</small>
+            </button>
+          )
+        })}
+      </div>
+      {canExpand && (
+        <button type="button" className="document-threat-toggle" onClick={() => setExpanded((current) => !current)}>
+          {expanded ? 'Réduire' : 'Voir les autres'}
+        </button>
+      )}
     </div>
   )
 }
-
 function lineRows(text, matches) {
   const rows = String(text || '').split('\n')
   let cursor = 0
@@ -460,7 +511,7 @@ function lineRows(text, matches) {
   })
 }
 
-function renderHighlightedParts(parts, selectedMatchId) {
+function renderHighlightedParts(parts, selectedMatchId, onSelect) {
   return parts.map((part, index) => {
     if (part.kind !== 'mark') return <span key={index}>{part.text}</span>
     const id = matchKey(part.match)
@@ -469,6 +520,14 @@ function renderHighlightedParts(parts, selectedMatchId) {
         className={`document-dlp-mark severity-${severityClass(part.match)} ${selectedMatchId === id ? 'is-selected' : ''}`}
         data-match-id={id}
         key={index}
+        onClick={() => onSelect?.(part.match)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          onSelect?.(part.match)
+        }}
+        role="button"
+        tabIndex={0}
         title={`${displayType(part.match?.type)} - ${severityClass(part.match)}`}
       >
         {part.text}
@@ -572,6 +631,37 @@ function filterHighlightableMatches(matches, text) {
   return (matches || [])
     .filter((match) => Number.isInteger(match.start) && Number.isInteger(match.end))
     .filter((match) => match.start >= 0 && match.end > match.start && match.end <= length)
+}
+
+function severityCounts(matches) {
+  return (matches || []).reduce((counts, match) => {
+    const group = severityGroup(match)
+    return { ...counts, total: counts.total + 1, [group]: counts[group] + 1 }
+  }, { total: 0, high: 0, medium: 0, low: 0 })
+}
+
+function threatFilters(counts) {
+  return [
+    { key: 'all', label: 'Toutes', count: counts.total },
+    { key: 'high', label: 'Élevées', count: counts.high },
+    { key: 'medium', label: 'Moyennes', count: counts.medium },
+    counts.low > 0 ? { key: 'low', label: 'Faibles', count: counts.low } : null,
+  ].filter(Boolean).filter((item) => item.key === 'all' || item.count > 0)
+}
+
+function threatSummary(counts) {
+  const parts = [`${counts.total} ${counts.total > 1 ? 'menaces détectées' : 'menace détectée'}`]
+  if (counts.high > 0) parts.push(`${counts.high} ${counts.high > 1 ? 'élevées' : 'élevée'}`)
+  if (counts.medium > 0) parts.push(`${counts.medium} ${counts.medium > 1 ? 'moyennes' : 'moyenne'}`)
+  if (counts.low > 0) parts.push(`${counts.low} ${counts.low > 1 ? 'faibles' : 'faible'}`)
+  return parts.join(' · ')
+}
+
+function severityGroup(match) {
+  const normalized = severityClass(match)
+  if (normalized === 'high') return 'high'
+  if (normalized === 'low') return 'low'
+  return 'medium'
 }
 
 function severityClass(match) {
