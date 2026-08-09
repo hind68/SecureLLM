@@ -34,48 +34,29 @@ export default function FileAttachmentCard({ attachment, hideActions = false, hi
     )
   }
 
+  const canOpen = !hideActions && !hideViewButton
   return (
-    <li className="file-message-card">
+    <li
+      className={`file-message-card${variant === 'dlp-alert' ? ' dlp-file-card' : ''}${canOpen ? ' is-clickable' : ''}`}
+      onClick={canOpen ? () => emitAction(onAction, onInspect, attachment, 'original') : undefined}
+      onKeyDown={canOpen ? (event) => handleCardKeyDown(event, onAction, onInspect, attachment) : undefined}
+      role={canOpen ? 'button' : undefined}
+      tabIndex={canOpen ? 0 : undefined}
+      title={canOpen ? `Ouvrir ${filename}` : filename}
+    >
       {getFileIcon(filename, 32)}
       <span className="file-message-copy">
         <strong title={filename}>{filename}</strong>
         <small>{formatBytes(size)}</small>
       </span>
-      {!hideActions && (
-        <span className="attachment-actions">
-          {!hideViewButton && (
-            <button
-              className="attachment-view-button"
-              type="button"
-              aria-label={`Voir ${filename}`}
-              title={`Voir ${filename}`}
-              onClick={() => emitAction(onAction, onInspect, attachment, 'view')}
-            >
-              Voir
-            </button>
-          )}
-          <button
-            className="attachment-view-button"
-            type="button"
-            aria-label={`Inspecter ${filename}`}
-            title={`Inspecter ${filename}`}
-            onClick={() => emitAction(onAction, onInspect, attachment, 'inspect')}
-          >
-            Inspecter
-          </button>
-          <button
-            className="attachment-view-button"
-            type="button"
-            aria-label={`Afficher la version sécurisée de ${filename}`}
-            title={`Version sécurisée de ${filename}`}
-            onClick={() => emitAction(onAction, onInspect, attachment, 'secure')}
-          >
-            Version sécurisée
-          </button>
-        </span>
-      )}
     </li>
   )
+}
+
+function handleCardKeyDown(event, onAction, onInspect, attachment) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  emitAction(onAction, onInspect, attachment, 'original')
 }
 
 function emitAction(onAction, onInspect, attachment, mode) {
@@ -93,7 +74,7 @@ function getFileIcon(filename, size = 32) {
     <img
       className="file-type-icon"
       src={src}
-      alt="icon"
+      alt=""
       aria-hidden="true"
       style={{ width: size, height: size }}
     />

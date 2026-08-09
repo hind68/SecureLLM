@@ -211,8 +211,8 @@ public class ConversationService {
                 safeMessage = dlpService.safeMessageForLlm(content, files, conversation.getUtilisateur().getExternalId());
             }
         } catch (DlpBlockedException exception) {
-            persistBlockedUserMessage(conversation, content, files, exception);
-            throw exception;
+            List<AttachmentMetadata> persistedAttachments = persistBlockedUserMessage(conversation, content, files, exception);
+            throw new PersistedDlpBlockedException(exception, persistedAttachments);
         }
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
         Message userMessage = messageRepository.save(new Message(
@@ -380,7 +380,7 @@ public class ConversationService {
         );
     }
 
-    private void persistBlockedUserMessage(Conversation conversation, String content, List<MultipartFile> files, DlpBlockedException exception) {
+    private List<AttachmentMetadata> persistBlockedUserMessage(Conversation conversation, String content, List<MultipartFile> files, DlpBlockedException exception) {
         int nextOrder = messageRepository.findMaxOrdre(conversation) + 1;
         String maskedText = exception.getMaskedText() == null ? "" : exception.getMaskedText();
         Message userMessage = new Message(
@@ -389,7 +389,8 @@ public class ConversationService {
                 nextOrder,
                 StatutMessage.DLP_BLOCKED,
                 maskedText,
-                null
+                null,
+                conversation.getModele()
         );
         userMessage.blockByDlp(
                 exception.getHighestSeverity(),
@@ -407,6 +408,7 @@ public class ConversationService {
             conversation.rename(titleFromMasked(maskedText));
         }
         conversation.touchLastMessageAt(Instant.now());
+        return persistedAttachments;
     }
 
     private String serializeDetectedTypes(Set<String> detectedTypes) {
@@ -436,10 +438,12 @@ public class ConversationService {
         return matches.stream()
                 .map(match -> valueOrEmptyLong(match.attachmentId()) + "\t"
                         + encodeMatchField(match.source()) + "\t"
+                        + encodeMatchField(match.id()) + "\t"
                         + encodeMatchField(match.type()) + "\t"
                         + valueOrEmpty(match.start()) + "\t"
                         + valueOrEmpty(match.end()) + "\t"
                         + valueOrEmpty(match.lineNumber()) + "\t"
+                        + encodeMatchField(match.severity()) + "\t"
                         + encodeMatchField(match.placeholder()))
                 .collect(Collectors.joining("\n"));
     }
@@ -515,24 +519,54 @@ public class ConversationService {
             return new DlpPublicMatch(
                     null,
                     null,
+                    null,
                     decodeMatchField(parts[0]),
                     parseInteger(parts[1]),
                     parseInteger(parts[2]),
                     parseInteger(parts[3]),
+                    null,
                     decodeMatchField(parts[4])
             );
         }
-        if (parts.length != 7) {
+        if (parts.length == 7) {
+            return new DlpPublicMatch(
+                    parseLongObject(parts[0]),
+                    decodeMatchField(parts[1]),
+                    null,
+                    decodeMatchField(parts[2]),
+                    parseInteger(parts[3]),
+                    parseInteger(parts[4]),
+                    parseInteger(parts[5]),
+                    null,
+                    decodeMatchField(parts[6])
+            );
+        }
+        if (parts.length == 8) {
+            return new DlpPublicMatch(
+                    parseLongObject(parts[0]),
+                    decodeMatchField(parts[1]),
+                    null,
+                    decodeMatchField(parts[2]),
+                    parseInteger(parts[3]),
+                    parseInteger(parts[4]),
+                    parseInteger(parts[5]),
+                    decodeMatchField(parts[6]),
+                    decodeMatchField(parts[7])
+            );
+        }
+        if (parts.length != 9) {
             return null;
         }
         return new DlpPublicMatch(
                 parseLongObject(parts[0]),
                 decodeMatchField(parts[1]),
                 decodeMatchField(parts[2]),
-                parseInteger(parts[3]),
+                decodeMatchField(parts[3]),
                 parseInteger(parts[4]),
                 parseInteger(parts[5]),
-                decodeMatchField(parts[6])
+                parseInteger(parts[6]),
+                decodeMatchField(parts[7]),
+                decodeMatchField(parts[8])
         );
     }
 
@@ -595,6 +629,9 @@ public class ConversationService {
 
     private StreamErrorResponse streamError(DlpAnalysisException exception) {
         if (exception instanceof DlpBlockedException blockedException) {
+            List<AttachmentMetadata> attachments = blockedException instanceof PersistedDlpBlockedException persisted
+                    ? persisted.persistedAttachments()
+                    : blockedException.getAttachments().stream().map(attachment -> attachment.metadata(null)).toList();
             return new StreamErrorResponse(
                     "DLP_BLOCKED",
                     "Votre message contient une donnée sensible et ne peut pas être envoyé.",
@@ -602,7 +639,7 @@ public class ConversationService {
                     blockedException.getHighestSeverity(),
                     blockedException.getMaskedText(),
                     blockedException.getMatches(),
-                    blockedException.getAttachments().stream().map(attachment -> attachment.metadata(null)).toList()
+                    attachments
             );
         }
         if (exception instanceof DlpUnavailableException) {
@@ -688,6 +725,25 @@ public class ConversationService {
             Long messageId,
             String content
     ) {
+    }
+
+    private static class PersistedDlpBlockedException extends DlpBlockedException {
+        private final List<AttachmentMetadata> persistedAttachments;
+
+        PersistedDlpBlockedException(DlpBlockedException source, List<AttachmentMetadata> persistedAttachments) {
+            super(
+                    source.getHighestSeverity(),
+                    source.getDetectedTypes(),
+                    source.getMaskedText(),
+                    source.getMatches(),
+                    source.getAttachments()
+            );
+            this.persistedAttachments = persistedAttachments == null ? List.of() : List.copyOf(persistedAttachments);
+        }
+
+        List<AttachmentMetadata> persistedAttachments() {
+            return persistedAttachments;
+        }
     }
 
     public record StreamErrorResponse(

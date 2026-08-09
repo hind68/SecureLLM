@@ -22,8 +22,8 @@
 }
 
 .message.user .bubble {
-  width: max-content;
-  max-width: min(600px, 82%);
+  width: fit-content;
+  max-width: min(75%, 48rem);
   border-radius: 0;
   background: transparent;
   padding: 0;
@@ -36,8 +36,8 @@
 }
 
 .user-message-stack {
-  width: max-content;
-  max-width: min(600px, 82%);
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -45,16 +45,23 @@
 }
 
 .user-text-bubble {
-  width: max-content;
+  width: fit-content;
   max-width: 100%;
-  border-radius: 18px 4px 0 18px;
-  background-color: #F3F4F6;
-  color: #111827;
-  padding: 10px 16px;
+  overflow: hidden;
+  border-radius: 16px 2px 16px 16px;
+  background-color: #F1F5F9;
+  color: #1E293B;
+  padding: 12px 20px;
+}
+
+.message.user > .user-message-stack {
+  width: fit-content;
+  max-width: min(75%, 48rem);
 }
 
 .user-text-bubble p {
   margin: 0;
+  overflow: hidden;
   overflow-wrap: break-word;
   word-break: normal;
   white-space: pre-wrap;
@@ -63,10 +70,14 @@
 
 .message.assistant .bubble {
   width: 100%;
+  max-width: 100%;
+  overflow: visible;
   border: 0;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
-  padding: 2px 0;
+  color: #1E293B;
+  padding: 0;
 }
 
 .message.assistant {
@@ -84,6 +95,7 @@
   margin-bottom: 6px;
   color: #333333;
   direction: ltr;
+ 
 }
 
 .assistant-logo {
@@ -124,7 +136,9 @@
 
 .bubble p {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .message.user .user-text-bubble p {
@@ -272,7 +286,8 @@
 }
 
 .dlp-alert {
-  width: min(var(--assistant-content-width), 100%);
+  width: 100%;
+  max-width: 100%;
   background-color: #FEF2F2;
   border: 1px solid #FECACA;
   border-radius: 8px;
@@ -546,6 +561,22 @@
   box-shadow: none;
 }
 
+.file-message-card.is-clickable {
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.file-message-card.is-clickable:hover,
+.file-message-card.is-clickable:focus-visible {
+  border-color: #CBD5E1;
+  background-color: #F8FAFC;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  outline: none;
+}
+
 .file-message-copy {
   min-width: 0;
   display: grid;
@@ -598,18 +629,31 @@
   justify-content: flex-end;
 }
 
-.file-message-card .attachment-view-button {
-  background: transparent;
-  color: #4F46E5;
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
+.dlp-file-panel .message-attachments {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: stretch;
 }
 
-.file-message-card .attachment-view-button:hover {
-  color: #3730A3;
+.dlp-file-panel .file-message-card.dlp-file-card {
+  width: 100%;
+  margin-bottom: 0;
+  border-color: #FECACA;
+  background-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 2px rgba(127, 29, 29, 0.08);
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card .attachment-view-button {
+  display: none;
+}
+
+.dlp-file-inspection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  width: 100%;
 }
 
 .dlp-mask-note {
@@ -672,4 +716,76 @@
     opacity: 1;
     transform: translateY(-4px);
   }
+}
+.dlp-inspect-primary {
+  flex: 0 0 auto;
+  width: fit-content;
+  border: 1px solid #FCA5A5;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #991B1B;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  padding: 8px 14px;
+}
+
+.dlp-inspect-primary:hover {
+  background: #FEF2F2;
+}
+
+.message.assistant.dlp-blocked-response {
+  width: min(var(--assistant-content-width), calc(100% - 36px));
+  margin-right: auto;
+  margin-left: auto;
+  justify-content: flex-start;
+}
+
+.message.assistant.dlp-blocked-response .bubble {
+  width: fit-content;
+  max-width: min(75%, 48rem);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.dlp-system-response {
+  max-width: 85%;
+  margin-top: 16px;
+  margin-right: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.dlp-system-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 999px;
+  background: #FEE2E2;
+  color: #991B1B;
+  display: grid;
+  place-items: center;
+}
+
+.dlp-system-avatar .dlp-alert-icon {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.dlp-system-response .dlp-alert {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
 }

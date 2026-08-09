@@ -37,6 +37,7 @@ export default function ChatThread({
         {messages.map((item) => (
           <ChatMessage
             copiedKey={copiedKey}
+            fallbackModelAlias={activeModelAlias}
             fallbackModelName={activeModelName || activeModelAlias}
             key={item.id}
             message={item}

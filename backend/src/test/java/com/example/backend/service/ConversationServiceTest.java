@@ -382,7 +382,7 @@ class ConversationServiceTest {
                         "HIGH",
                         Set.of("moroccan_cin"),
                         "Ma CIN est [MOROCCAN_CIN_1]",
-                        List.of(new com.example.backend.integration.dlp.DlpPublicMatch(null, null, "moroccan_cin", 10, 18, 1, "[MOROCCAN_CIN_1]"))
+                        List.of(new com.example.backend.integration.dlp.DlpPublicMatch(null, null, "moroccan_cin_1", "moroccan_cin", 10, 18, 1, "HIGH", "[MOROCCAN_CIN_1]"))
                 ));
 
         service.streamMessage(10L, new SendMessageRequest("Ma CIN est AB123456"));
@@ -605,6 +605,7 @@ class ConversationServiceTest {
         assertThat(saved.getContenu()).doesNotContain("Ma CIN est AB123456");
         assertThat(saved.getDlpHighestSeverity()).isEqualTo("HIGH");
         assertThat(saved.getDlpDetectedTypes()).contains(type);
+        assertThat(saved.getModele().getAliasInterne()).isEqualTo("secure-groq");
     }
 
     private static Stream<Arguments> historicalSensitiveMessages() {

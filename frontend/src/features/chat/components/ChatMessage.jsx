@@ -1,4 +1,4 @@
-import { Fragment, memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { CheckIcon, CopyIcon } from '../../../components/common/icons'
 import ModelLogo from '../../models/components/ModelLogo'
 import MarkdownContent from './MarkdownContent'
@@ -8,10 +8,11 @@ import { dlpUserMessage } from '../utils/dlpErrors'
 import { splitMaskedTextByPlaceholders, normalizeSensitiveSpans, splitTextBySpans } from '../utils/dlpViews'
 import { detectTextDirection } from '../utils/markdown'
 
-function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, onInspectDocument, setCopiedKey }) {
+function ChatMessage({ copiedKey, fallbackModelAlias, fallbackModelName, message, onCopy, onInspectDocument, setCopiedKey }) {
   const isUser = message.role === 'USER'
   const isDlpBlocked = message.status === 'DLP_BLOCKED'
-  const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, message.modelAlias)
+  const effectiveModelAlias = message.modelAlias || fallbackModelAlias || fallbackModelName
+  const modelName = cleanModelName(message.modelDisplayName || fallbackModelName, effectiveModelAlias)
   const isWaiting = !isUser && message.status === 'EN_COURS' && !message.content
   const isFailed = !isUser && message.status === 'ECHEC'
   const messageCopyKey = `message-${message.id}`
@@ -24,6 +25,7 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, onInspectD
   const isSafeCopied = copiedKey === safeCopyKey
   const textDirection = detectTextDirection(message.content || '')
   const visibleContent = displayableMessageContent(message)
+  const dlpPromptContent = message.dlpOriginalText || displayableMessageContent(message) || ''
 
   async function copyResponse(copyKey = messageCopyKey, text = message.content || '') {
     const success = await onCopy(text)
@@ -33,31 +35,34 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, onInspectD
 
   if (isUser && isDlpBlocked) {
     return (
-      <Fragment>
-        <article className="message user">
-          <div className="user-message-stack">
-            <AttachmentList attachments={message.attachments} onInspectDocument={onInspectDocument} />
-            {visibleContent && (
-              <div className="user-text-bubble">
-                <p>{visibleContent}</p>
+      <>
+        {(dlpPromptContent || message.attachments?.length > 0) && (
+          <article className="message user">
+            <div className="user-message-stack">
+              <AttachmentList attachments={message.attachments} onInspectDocument={onInspectDocument} />
+              {dlpPromptContent && (
+                <div className="user-text-bubble">
+                  <p>{dlpPromptContent}</p>
+                </div>
+              )}
+            </div>
+            {dlpPromptContent && (
+              <div className="message-actions user-actions">
+                <button
+                  type="button"
+                  aria-label={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
+                  title={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
+                  onClick={() => copyResponse(promptCopyKey, dlpPromptContent)}
+                >
+                  {isPromptCopied ? <CheckIcon /> : <CopyIcon />}
+                </button>
               </div>
             )}
-          </div>
-          {visibleContent && (
-            <div className="message-actions user-actions">
-              <button
-                type="button"
-                aria-label={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
-                title={isPromptCopied ? 'Copié' : 'Copier mon prompt'}
-                onClick={() => copyResponse(promptCopyKey, visibleContent)}
-              >
-                {isPromptCopied ? <CheckIcon /> : <CopyIcon />}
-              </button>
-            </div>
-          )}
-        </article>
+          </article>
+        )}
         <article className="message assistant dlp-blocked-response">
           <div className="bubble">
+            <AssistantMessageHeader modelAlias={effectiveModelAlias} modelName={modelName} />
             <DlpBlockedMessage
               alertCopied={isAlertCopied}
               copied={isSafeCopied}
@@ -68,14 +73,14 @@ function ChatMessage({ copiedKey, message, fallbackModelName, onCopy, onInspectD
             />
           </div>
         </article>
-      </Fragment>
+      </>
     )
   }
 
   return (
     <article className={`message ${isUser ? 'user' : 'assistant'}`}>
       <div className="bubble">
-        {!isUser && <AssistantMessageHeader modelAlias={message.modelAlias} modelName={modelName} />}
+        {!isUser && <AssistantMessageHeader modelAlias={effectiveModelAlias} modelName={modelName} />}
         {isUser ? (
           <div className="user-message-stack">
             <AttachmentList attachments={message.attachments} onInspectDocument={onInspectDocument} />
@@ -155,16 +160,6 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
     [matches, originalText],
   )
 
-  function handleInspectDocument() {
-    // TODO: Ouvrir le panneau latéral d'inspection de document.
-    onInspectDocument?.({
-      attachment: attachments[0],
-      mode: 'inspect',
-      matches,
-      maskedText: safeText,
-    })
-  }
-
   return (
     <div className="dlp-alert" role="alert">
       <div className="dlp-alert-heading">
@@ -187,12 +182,15 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
       {hasDlpFiles ? (
         <section className="dlp-file-panel">
           <div className="dlp-file-inspection-row">
-            <AttachmentList attachments={attachments} hideActions onInspectDocument={onInspectDocument} />
-            <button type="button" className="dlp-inspect-button" onClick={handleInspectDocument}>
-              Inspecter le document
+            <AttachmentList attachments={attachments} onInspectDocument={onInspectDocument} variant="dlp-alert" />
+            <button
+              type="button"
+              className="dlp-inspect-primary"
+              onClick={() => inspectBlockedAttachment(attachments, matches, safeText, onInspectDocument)}
+            >
+              Inspecter
             </button>
           </div>
-          <DetectionList matches={matches} />
         </section>
       ) : (
         <div className="dlp-alert-tabs">
@@ -243,16 +241,31 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
   )
 }
 
+function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDocument) {
+  const attachment = attachments.find((item) => item?.decision === 'BLOCK') || attachments[0]
+  if (!attachment) return
+  const attachmentMatches = matches.filter((match) => (
+    !match.attachmentId || !attachment.id || match.attachmentId === attachment.id || match.source === attachment.filename
+  ))
+  onInspectDocument?.({
+    attachment,
+    attachmentId: attachment.id,
+    maskedText: attachment.id ? '' : maskedText,
+    matches: attachmentMatches,
+    requestedView: 'detected',
+  })
+}
+
 function displayableMessageContent(message) {
   const content = message.content || ''
   const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0
-  if (hasAttachments && /^Pieces jointes\s*:/i.test(content.trim())) {
+  if (hasAttachments && /^Pi[eè]ces jointes\s*:/i.test(content.trim())) {
     return ''
   }
   return content
 }
 
-function AttachmentList({ attachments, hideActions = false, hideViewButton = false, onInspectDocument }) {
+function AttachmentList({ attachments, hideActions = false, hideViewButton = false, onInspectDocument, variant = 'message' }) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null
   return (
     <ul className="message-attachments">
@@ -262,11 +275,18 @@ function AttachmentList({ attachments, hideActions = false, hideViewButton = fal
           hideActions={hideActions}
           hideViewButton={hideViewButton}
           key={`${attachment.filename || attachment.name}-${index}`}
-          onAction={(selectedAttachment, mode) => onInspectDocument?.({ attachment: selectedAttachment, mode })}
+          variant={variant}
+          onAction={(selectedAttachment, mode) => onInspectDocument?.({ attachment: selectedAttachment, attachmentId: selectedAttachment.id, requestedView: normalizeAttachmentAction(mode) })}
         />
       ))}
     </ul>
   )
+}
+
+function normalizeAttachmentAction(mode) {
+  if (mode === 'inspect' || mode === 'detected') return 'detected'
+  if (mode === 'secure') return 'secure'
+  return 'original'
 }
 
 function hasMaskedAttachment(attachments) {
@@ -367,6 +387,7 @@ function areChatMessagesEqual(previous, next) {
   const nextMessage = next.message
   const sameStableProps = (
     previousMessage === nextMessage &&
+    previous.fallbackModelAlias === next.fallbackModelAlias &&
     previous.fallbackModelName === next.fallbackModelName &&
     previous.onCopy === next.onCopy &&
     previous.onInspectDocument === next.onInspectDocument &&

@@ -4,7 +4,7 @@ import useMessageStream from './useMessageStream'
 import { logDevelopmentError } from '../../../utils/errors'
 import { focusTextareaOnNextFrame, shouldFocusComposer } from '../utils/composerFocus'
 
-export const MAX_ATTACHMENTS = 5
+export const MAX_ATTACHMENTS = Number.POSITIVE_INFINITY
 export const ACCEPTED_ATTACHMENT_EXTENSIONS = [
   '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
   '.docx', '.pptx', '.csv', '.xlsx', '.zip',
@@ -174,11 +174,9 @@ export default function useChatUi({
       accepted.push(file)
     }
     setAttachments((current) => {
-      const remaining = Math.max(0, MAX_ATTACHMENTS - current.length)
-      if (accepted.length > remaining) {
-        showError(`Vous pouvez joindre au maximum ${MAX_ATTACHMENTS} fichiers.`)
-      }
-      return [...current, ...accepted.slice(0, remaining)]
+      const existingKeys = new Set(current.map(fileKey))
+      const uniqueAccepted = accepted.filter((file) => !existingKeys.has(fileKey(file)))
+      return [...current, ...uniqueAccepted]
     })
   }, [showError])
 
@@ -235,4 +233,8 @@ export default function useChatUi({
     removeAttachment,
     textareaRef,
   }
+}
+
+function fileKey(file) {
+  return `${file.name || ''}:${file.size || 0}:${file.type || ''}`
 }

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ChatComposer from '../chat/components/ChatComposer'
 import DocumentInspectorPanel from '../chat/components/DocumentInspectorPanel'
 import ChatThread from '../chat/components/ChatThread'
@@ -10,6 +10,10 @@ import ConversationMenu from '../conversations/components/ConversationMenu'
 import SearchModal from '../conversations/components/SearchModal'
 import Sidebar from './Sidebar'
 import { displayConversationTitle } from '../../utils/modelMetadata'
+
+const INSPECTOR_MIN_WIDTH = 400
+const INSPECTOR_MAX_WIDTH = 900
+const INSPECTOR_DEFAULT_WIDTH = 560
 
 export default function AppLayout({
   layout,
@@ -23,7 +27,45 @@ export default function AppLayout({
   const activeConversation = state.activeConversation
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [inspectedDocument, setInspectedDocument] = useState(null)
+  const [isInspectorClosing, setIsInspectorClosing] = useState(false)
+  const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT_WIDTH)
   const dragDepthRef = useRef(0)
+  const resizeFrameRef = useRef(0)
+  const closeInspectorTimerRef = useRef(0)
+  const previousConversationIdRef = useRef(activeConversation?.id)
+
+  const closeInspector = useCallback(() => {
+    if (!inspectedDocument) return
+    window.clearTimeout(closeInspectorTimerRef.current)
+    setIsInspectorClosing(true)
+    closeInspectorTimerRef.current = window.setTimeout(() => {
+      setInspectedDocument(null)
+      setIsInspectorClosing(false)
+    }, 230)
+  }, [inspectedDocument])
+
+  const openInspector = useCallback((document) => {
+    window.clearTimeout(closeInspectorTimerRef.current)
+    setIsInspectorClosing(false)
+    setInspectedDocument(normalizeInspectionTarget(document, activeConversation?.id))
+  }, [activeConversation?.id])
+
+  const attachSecureVersion = useCallback((file) => {
+    chat.addAttachments([file])
+    feedback.showNotice('Version sécurisée ajoutée aux pièces jointes')
+    closeInspector()
+    window.requestAnimationFrame(() => chat.textareaRef.current?.focus())
+  }, [chat, closeInspector, feedback])
+
+  useEffect(() => () => window.clearTimeout(closeInspectorTimerRef.current), [])
+
+  useEffect(() => {
+    const conversationId = activeConversation?.id
+    if (previousConversationIdRef.current !== conversationId) {
+      queueMicrotask(closeInspector)
+      previousConversationIdRef.current = conversationId
+    }
+  }, [activeConversation?.id, closeInspector])
 
   const containsFiles = useCallback((event) => (
     Array.from(event.dataTransfer?.types || []).includes('Files')
@@ -59,6 +101,35 @@ export default function AppLayout({
     if (status.isGenerating) return
     chat.addAttachments(event.dataTransfer.files)
   }, [chat, containsFiles, status.isGenerating])
+
+  const handleInspectorResizePointerDown = useCallback((event) => {
+    event.preventDefault()
+    const pointerId = event.pointerId
+    const startX = event.clientX
+    const startWidth = inspectorWidth
+    const maxWidth = Math.min(INSPECTOR_MAX_WIDTH, Math.floor(window.innerWidth * 0.72))
+
+    function handlePointerMove(moveEvent) {
+      const delta = moveEvent.clientX - startX
+      const nextWidth = Math.min(maxWidth, Math.max(INSPECTOR_MIN_WIDTH, startWidth - delta))
+      cancelAnimationFrame(resizeFrameRef.current)
+      resizeFrameRef.current = requestAnimationFrame(() => setInspectorWidth(nextWidth))
+    }
+
+    function handlePointerUp() {
+      cancelAnimationFrame(resizeFrameRef.current)
+      document.body.classList.remove('is-resizing-inspector')
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+
+    document.body.classList.add('is-resizing-inspector')
+    event.currentTarget.setPointerCapture?.(pointerId)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+  }, [inspectorWidth])
 
   return (
     <div className={`app-shell ${layout.isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -189,7 +260,7 @@ export default function AppLayout({
           messages={chat.messages}
           messagesRef={chat.messagesRef}
           onCopy={chat.onCopy}
-          onInspectDocument={setInspectedDocument}
+          onInspectDocument={openInspector}
           onMessagesScroll={chat.onMessagesScroll}
           setCopiedKey={chat.setCopiedKey}
         />
@@ -204,7 +275,7 @@ export default function AppLayout({
           isGenerating={status.isGenerating}
           onDraftChange={chat.setDraft}
           onFilesSelected={chat.addAttachments}
-          onInspectDocument={setInspectedDocument}
+          onInspectDocument={openInspector}
           onKeyDown={chat.handleKeyDown}
           onRemoveFile={chat.removeAttachment}
           onRemoveFiles={chat.clearAttachments}
@@ -221,13 +292,25 @@ export default function AppLayout({
       </main>
 
       {inspectedDocument && (
-        <DocumentInspectorPanel
-          attachment={inspectedDocument}
-          conversationId={activeConversation?.id}
-          key={`${inspectedDocument.attachment?.id || inspectedDocument.id || inspectedDocument.attachment?.filename || inspectedDocument.filename || inspectedDocument.name}-${inspectedDocument.mode || 'view'}`}
-          onClose={() => setInspectedDocument(null)}
-          onSendSecure={(attachment) => activeConversation && chat.streamSecureAttachment(activeConversation, attachment)}
-        />
+        <>
+          <div
+            className="document-panel-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionner le panneau d'inspection"
+            tabIndex={0}
+            onPointerDown={handleInspectorResizePointerDown}
+          />
+          <DocumentInspectorPanel
+            attachment={inspectedDocument}
+            closing={isInspectorClosing}
+            conversationId={activeConversation?.id}
+            key={`${inspectedDocument.attachment?.id || inspectedDocument.id || inspectedDocument.attachment?.filename || inspectedDocument.filename || inspectedDocument.name}-${inspectedDocument.mode || 'view'}`}
+            onAttachSecure={attachSecureVersion}
+            onClose={closeInspector}
+            width={inspectorWidth}
+          />
+        </>
       )}
       </div>
 
@@ -263,4 +346,23 @@ export default function AppLayout({
       )}
     </div>
   )
+}
+
+function normalizeInspectionTarget(target, conversationId) {
+  const attachment = target?.attachment || target
+  const requestedView = target?.requestedView || normalizeRequestedView(target?.mode)
+  return {
+    ...target,
+    attachment,
+    attachmentId: target?.attachmentId || attachment?.id,
+    conversationId,
+    requestedView,
+    mode: requestedView,
+  }
+}
+
+function normalizeRequestedView(mode) {
+  if (mode === 'inspect' || mode === 'detected') return 'detected'
+  if (mode === 'secure') return 'secure'
+  return 'original'
 }

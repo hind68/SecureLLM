@@ -126,29 +126,31 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public AttachmentInspectionResponse inspection(Long id) {
         Attachment attachment = ownedAttachment(id);
+        String extractedText = attachment.getExtractedText() == null ? "" : attachment.getExtractedText();
         return new AttachmentInspectionResponse(
                 attachment.getId(),
                 attachment.getOriginalFilename(),
                 attachment.getMimeType(),
                 attachment.getExtractionStatus(),
-                attachment.getExtractedText() == null ? "" : attachment.getExtractedText(),
-                attachIds(attachment.getId(), attachment.getOriginalFilename(), parseMatches(attachment.getMatchesJson()))
+                extractedText,
+                responseMatches(attachment.getId(), attachment.getOriginalFilename(), extractedText, parseMatches(attachment.getMatchesJson()))
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AttachmentSecureResponse secure(Long id) {
         Attachment attachment = ownedAttachment(id);
+        String maskedText = ensureMaskedText(attachment);
         return new AttachmentSecureResponse(
                 attachment.getId(),
                 attachment.getOriginalFilename(),
                 attachment.getMimeType(),
                 attachment.getExtractionStatus(),
-                attachment.getMaskedText() == null ? "" : attachment.getMaskedText()
+                maskedText
         );
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<byte[]> secureDownload(Long id) {
         AttachmentSecureResponse secure = secure(id);
         String base = secure.filename().replaceAll("\\.[^.]+$", "");
@@ -166,13 +168,13 @@ public class AttachmentService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public String maskedTextForConversationAttachment(Long attachmentId, Long conversationId) {
         Attachment attachment = ownedAttachment(attachmentId);
         if (!attachment.getMessage().getConversation().getId().equals(conversationId)) {
             throw new ResponseStatusException(NOT_FOUND, "Attachment not found");
         }
-        return attachment.getMaskedText() == null ? "" : attachment.getMaskedText();
+        return ensureMaskedText(attachment);
     }
 
     private Attachment ownedAttachment(Long id) {
@@ -205,10 +207,12 @@ public class AttachmentService {
         }
         return matches.stream()
                 .map(match -> encodeField(match.source()) + "\t"
+                        + encodeField(match.id()) + "\t"
                         + encodeField(match.type()) + "\t"
                         + valueOrEmpty(match.start()) + "\t"
                         + valueOrEmpty(match.end()) + "\t"
                         + valueOrEmpty(match.lineNumber()) + "\t"
+                        + encodeField(match.severity()) + "\t"
                         + encodeField(match.placeholder()))
                 .collect(java.util.stream.Collectors.joining("\n"));
     }
@@ -225,32 +229,120 @@ public class AttachmentService {
 
     private DlpPublicMatch parseMatch(String line) {
         String[] parts = line.split("\\t", -1);
-        if (parts.length != 6) {
-            return null;
+        if (parts.length == 6) {
+            return new DlpPublicMatch(
+                    null,
+                    decodeField(parts[0]),
+                    null,
+                    decodeField(parts[1]),
+                    parseInteger(parts[2]),
+                    parseInteger(parts[3]),
+                    parseInteger(parts[4]),
+                    null,
+                    decodeField(parts[5])
+            );
+        }
+        if (parts.length != 7) {
+            if (parts.length != 8) {
+                return null;
+            }
+            return new DlpPublicMatch(
+                    null,
+                    decodeField(parts[0]),
+                    decodeField(parts[1]),
+                    decodeField(parts[2]),
+                    parseInteger(parts[3]),
+                    parseInteger(parts[4]),
+                    parseInteger(parts[5]),
+                    decodeField(parts[6]),
+                    decodeField(parts[7])
+            );
         }
         return new DlpPublicMatch(
                 null,
                 decodeField(parts[0]),
+                null,
                 decodeField(parts[1]),
                 parseInteger(parts[2]),
                 parseInteger(parts[3]),
                 parseInteger(parts[4]),
-                decodeField(parts[5])
+                decodeField(parts[5]),
+                decodeField(parts[6])
         );
     }
 
-    private List<DlpPublicMatch> attachIds(Long attachmentId, String source, List<DlpPublicMatch> matches) {
+    private List<DlpPublicMatch> responseMatches(Long attachmentId, String source, String extractedText, List<DlpPublicMatch> matches) {
+        if (extractedText == null || extractedText.isEmpty()) {
+            return List.of();
+        }
+        int textLength = extractedText.length();
         return matches.stream()
+                .filter(match -> match.start() != null && match.end() != null)
+                .filter(match -> match.start() >= 0 && match.end() > match.start() && match.end() <= textLength)
                 .map(match -> new DlpPublicMatch(
                         attachmentId,
                         source,
+                        match.id(),
                         match.type(),
                         match.start(),
                         match.end(),
-                        match.lineNumber(),
+                        lineNumber(extractedText, match.start()),
+                        match.severity(),
                         match.placeholder()
                 ))
                 .toList();
+    }
+
+    private String ensureMaskedText(Attachment attachment) {
+        String maskedText = attachment.getMaskedText() == null ? "" : attachment.getMaskedText();
+        if (!maskedText.isBlank()) {
+            return maskedText;
+        }
+        String extractedText = attachment.getExtractedText() == null ? "" : attachment.getExtractedText();
+        maskedText = maskFromStoredMatches(extractedText, parseMatches(attachment.getMatchesJson()));
+        if (!maskedText.isBlank()) {
+            attachment.setMaskedText(maskedText);
+            attachmentRepository.save(attachment);
+        }
+        return maskedText;
+    }
+
+    private String maskFromStoredMatches(String extractedText, List<DlpPublicMatch> matches) {
+        if (extractedText == null || extractedText.isBlank() || matches == null || matches.isEmpty()) {
+            return "";
+        }
+        StringBuilder masked = new StringBuilder(extractedText);
+        matches.stream()
+                .filter(match -> match.start() != null && match.end() != null)
+                .filter(match -> match.start() >= 0 && match.end() > match.start() && match.end() <= masked.length())
+                .sorted(java.util.Comparator.comparing(DlpPublicMatch::start).reversed())
+                .forEach(match -> masked.replace(match.start(), match.end(), placeholder(match)));
+        return masked.toString();
+    }
+
+    private Integer lineNumber(String text, Integer start) {
+        if (text == null || start == null || start <= 0) {
+            return 1;
+        }
+        int boundedStart = Math.min(start, text.length());
+        int line = 1;
+        for (int i = 0; i < boundedStart; i++) {
+            if (text.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    private String placeholder(DlpPublicMatch match) {
+        if (match.placeholder() != null && !match.placeholder().isBlank()) {
+            return match.placeholder();
+        }
+        String id = match.id();
+        if (id == null || id.isBlank()) {
+            id = match.type() == null || match.type().isBlank() ? "DLP" : match.type();
+        }
+        return "[" + id.toUpperCase() + "]";
     }
 
     private void deleteQuietly(Path path) {

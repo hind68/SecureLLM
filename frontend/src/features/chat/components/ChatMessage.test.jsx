@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import ChatMessage from './ChatMessage'
+import DocumentInspectorPanel from './DocumentInspectorPanel'
+import FileAttachmentCard from './FileAttachmentCard'
 
 describe('ChatMessage', () => {
   it('renders a persisted DLP block as a final error without loading dots', () => {
@@ -32,6 +35,7 @@ describe('ChatMessage', () => {
     expect(html).toContain('Voir la version sécurisée')
     expect(html).toContain('message user')
     expect(html).toContain('message assistant dlp-blocked-response')
+    expect(html).toContain('assistant-header')
     expect(html).not.toContain('disabled')
     expect(html).not.toContain('typing-indicator')
   })
@@ -86,6 +90,59 @@ describe('ChatMessage', () => {
     expect(html).toContain('disabled')
   })
 
+  it('uses the selected model logo for a blocked DLP response', () => {
+    const html = renderToStaticMarkup(
+      <ChatMessage
+        copiedKey=""
+        fallbackModelAlias="secure-gemini"
+        fallbackModelName="Gemini"
+        message={{
+          id: 46,
+          role: 'USER',
+          status: 'DLP_BLOCKED',
+          content: 'Token sk-secret',
+          modelAlias: 'secure-gemini',
+          modelDisplayName: 'Gemini',
+          dlpOriginalText: 'Token sk-secret',
+          dlpMaskedText: 'Token [OPENAI_API_KEY_1]',
+          dlpHighestSeverity: 'HIGH',
+          dlpDetectedTypes: ['openai_api_key'],
+          dlpMatches: [{ type: 'openai_api_key', start: 6, end: 15, lineNumber: 1, placeholder: '[OPENAI_API_KEY_1]' }],
+        }}
+        onCopy={vi.fn()}
+        setCopiedKey={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('/assets/gemini-provider-logo.png')
+    expect(html).toContain('Gemini')
+    expect(html).not.toContain('>GE<')
+  })
+
+  it('keeps user prompt wrapping natural without losing intentional line breaks', () => {
+    const shortHtml = renderUserMessage('hello oo')
+    const manualBreakHtml = renderUserMessage('hello\noo')
+    const longPrompt = 'hello '.repeat(80).trim()
+    const longHtml = renderUserMessage(longPrompt)
+    const css = readFileSync(new URL('../../../styles/messages.css', import.meta.url), 'utf8')
+
+    expect(shortHtml).toContain('<p>hello oo</p>')
+    expect(shortHtml).not.toContain('hello\noo')
+    expect(manualBreakHtml).toContain('hello\noo')
+    expect(longHtml).toContain(longPrompt)
+    expect(cssRule(css, '.message.user .bubble')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(css, '.message.user .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
+    expect(cssRule(css, '.user-message-stack')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(css, '.user-message-stack')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
+    expect(cssRule(css, '.user-text-bubble')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(css, '.user-text-bubble')).toMatch(/max-width:\s*100%;/)
+    expect(cssRule(css, '.user-text-bubble')).toMatch(/border-radius:\s*16px 2px 16px 16px;/)
+    expect(cssRule(css, '.user-text-bubble')).toMatch(/background-color:\s*#F1F5F9;/)
+    expect(cssRule(css, '.message.user .user-text-bubble p')).toMatch(/overflow-wrap:\s*break-word;/)
+    expect(cssRule(css, '.message.user .user-text-bubble p')).toMatch(/word-break:\s*normal;/)
+    expect(cssRule(css, '.message.user .user-text-bubble p')).toMatch(/white-space:\s*pre-wrap;/)
+  })
+
   it('shows copied confirmation only for the copied assistant message', () => {
     const html = renderToStaticMarkup(
       <ChatMessage
@@ -107,4 +164,245 @@ describe('ChatMessage', () => {
     expect(html).toContain('check-icon')
     expect(html).not.toContain('copy-icon')
   })
+
+  it('renders attachment cards as clickable cards without a view button', () => {
+    const html = renderToStaticMarkup(
+      <FileAttachmentCard
+        attachment={{ filename: 'rapport-confidentiel-tres-long.pdf', size: 2048 }}
+        onAction={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('role="button"')
+    expect(html).toContain('is-clickable')
+    expect(html).not.toContain('Voir')
+    expect(html).not.toContain('Inspecter')
+    expect(html).not.toContain('Menaces')
+    expect(html).not.toContain('Sécurisé')
+    expect(html).not.toContain('Envoyer au LLM')
+  })
+
+  it('renders the viewer segmented control labels', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{ attachment: { filename: 'secret.txt', decision: 'BLOCK' }, matches: [{ id: 'm1', type: 'ip_address', start: 0, end: 8, lineNumber: 1 }], mode: 'detected' }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Original')
+    expect(html).toContain('Menaces (1)')
+    expect(html).toContain('Sécurisé')
+    expect(html).toContain('aria-selected="true"')
+  })
+
+  it('renders detected threats immediately from the selected attachment target', () => {
+    const text = 'first line\nToken sk-test-secret\nEmail admin@example.com'
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'secrets.log', decision: 'MASK' },
+          extractedText: text,
+          requestedView: 'detected',
+          matches: [
+            { id: 'openai_api_key_1', type: 'openai_api_key', start: text.indexOf('sk-test-secret'), end: text.indexOf('sk-test-secret') + 'sk-test-secret'.length, lineNumber: 1, severity: 'high', placeholder: '[OPENAI_API_KEY_1]' },
+            { id: 'email_1', type: 'email', start: text.indexOf('admin@example.com'), end: text.indexOf('admin@example.com') + 'admin@example.com'.length, lineNumber: 1, severity: 'medium', placeholder: '[EMAIL_1]' },
+          ],
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Menaces (2)')
+    expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('Ligne 2')
+    expect(html).toContain('Ligne 3')
+    expect(html).toContain('Token sk-test-secret')
+    expect(html).toContain('Email admin@example.com')
+  })
+
+  it('renders the file secure version placeholders instead of attachment summary text', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 13, filename: 'safe.txt', decision: 'MASK', maskedText: 'Token [OPENAI_API_KEY_1]' },
+          maskedText: 'Pieces jointes: safe.txt',
+          requestedView: 'secure',
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('[OPENAI_API_KEY_1]')
+    expect(html).not.toContain('Pieces jointes: safe.txt')
+  })
+
+  it('keeps the inspector scroll inside the content area and the composer centered in chat space', () => {
+    const panelsCss = readFileSync(new URL('../../../styles/panels.css', import.meta.url), 'utf8')
+    const composerCss = readFileSync(new URL('../../../styles/composer.css', import.meta.url), 'utf8')
+    const inspectorSource = readFileSync(new URL('./DocumentInspectorPanel.jsx', import.meta.url), 'utf8')
+
+    expect(cssRule(panelsCss, '.document-inspector-panel')).toMatch(/overflow:\s*hidden;/)
+    expect(cssRule(panelsCss, '.document-inspector-viewer')).toMatch(/overflow-y:\s*auto;/)
+    expect(cssRule(panelsCss, '.document-inspector-viewer')).toMatch(/overflow-x:\s*hidden;/)
+    expect(cssRule(panelsCss, '.document-inspector-viewer')).toMatch(/background:\s*#F8FAFC;/)
+    expect(cssRule(panelsCss, '.document-original-code')).toMatch(/background:\s*#F8FAFC;/)
+    expect(cssRule(panelsCss, '.document-original-code')).toMatch(/color:\s*#1E293B;/)
+    expect(cssRule(panelsCss, '.document-original-code')).toMatch(/font-size:\s*inherit;/)
+    expect(cssRule(panelsCss, '.document-original-code')).toMatch(/overflow-y:\s*auto;/)
+    expect(cssRule(panelsCss, '.document-original-code')).toMatch(/scrollbar-width:\s*thin;/)
+    expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/position:\s*absolute;/)
+    expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/bottom:\s*0;/)
+    expect(cssRule(panelsCss, '.document-zoom-controls')).toMatch(/display:\s*flex;/)
+    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/display:\s*flex;/)
+    expect(cssRule(panelsCss, '.document-segmented-row .segmented-control button')).toMatch(/white-space:\s*nowrap;/)
+    expect(cssRule(panelsCss, '.document-segmented-row > .segmented-control')).toMatch(/flex-shrink:\s*0;/)
+    expect(cssRule(panelsCss, '.document-segmented-row > .segmented-control')).toMatch(/gap:\s*4px;/)
+    expect(cssRule(panelsCss, '.document-inspector-header .document-close-button')).toMatch(/border-radius:\s*999px;/)
+    expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/background:\s*#FFEDD5;/)
+    expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/color:\s*#9A3412;/)
+    expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/font-weight:\s*600;/)
+    expect(cssRule(panelsCss, '.document-line code')).not.toMatch(/word-break:\s*break-all;/)
+    expect(inspectorSource).toContain('useState(13)')
+    expect(inspectorSource).not.toContain('scale(')
+    expect(inspectorSource).toContain('fetchAttachmentContent')
+    expect(inspectorSource).toContain('fetchAttachmentInspection')
+    expect(inspectorSource).toContain('fetchAttachmentSecure')
+    expect(inspectorSource).toContain('EXTRACTION_UNAVAILABLE')
+    expect(inspectorSource).toContain('isTextLike(extension, contentType)')
+    expect(composerCss).toMatch(/\.composer-center\s*\{[^}]*position:\s*absolute;[^}]*left:\s*50%;/s)
+    expect(composerCss).not.toContain('100vw')
+  })
+
+  it('keeps blocked responses and the bottom button inside the chat content column', () => {
+    const messagesCss = readFileSync(new URL('../../../styles/messages.css', import.meta.url), 'utf8')
+    const chatCss = readFileSync(new URL('../../../styles/chat.css', import.meta.url), 'utf8')
+    const markdownCss = readFileSync(new URL('../../../styles/markdown.css', import.meta.url), 'utf8')
+
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/width:\s*min\(var\(--assistant-content-width\),\s*calc\(100% - 36px\)\);/)
+    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
+    expect(cssRule(messagesCss, '.message.assistant .bubble')).toMatch(/border-radius:\s*2px 16px 16px 16px;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/margin-left:\s*auto;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).not.toMatch(/width:\s*100%;/)
+    expect(cssRule(chatCss, '.go-bottom-button')).toMatch(/left:\s*50%;/)
+    expect(cssRule(chatCss, '.go-bottom-button')).not.toMatch(/right:\s*32px;/)
+    expect(cssRule(markdownCss, '.markdown-body')).toMatch(/overflow:\s*hidden;/)
+    expect(cssRule(markdownCss, '.markdown-body')).toMatch(/overflow-wrap:\s*break-word;/)
+    expect(cssRule(markdownCss, '.markdown-body')).toMatch(/white-space:\s*pre-wrap;/)
+  })
+
+  it('counts five current attachment matches in the viewer', () => {
+    const matches = Array.from({ length: 5 }, (_, index) => ({
+      id: `m${index + 1}`,
+      source: 'secret.txt',
+      type: 'ip_address',
+      start: index * 10,
+      end: index * 10 + 5,
+      lineNumber: index + 1,
+    }))
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 10, filename: 'secret.txt', decision: 'BLOCK' },
+          extractedText: 'aaaaa\nbbbbb\nccccc\nddddd\neeeee',
+          matches,
+          requestedView: 'detected',
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Menaces (5)')
+    expect(html).toContain('style="font-size:13px"')
+    expect(html).toContain('data-match-id="m1"')
+  })
+
+  it('renders secure masked text without the DOCX limitation banner', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 11, filename: 'secret.docx', decision: 'MASK' },
+          maskedText: 'Token [OPENAI_API_KEY_1]\nSuite',
+          requestedView: 'secure',
+        }}
+        onAttachSecure={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Token ')
+    expect(html).toContain('[OPENAI_API_KEY_1]')
+    expect(html).toContain('Télécharger')
+    expect(html).toContain('Partager')
+    expect(html).not.toContain('Mammoth')
+    expect(html).not.toContain('conversion PDF')
+  })
+
+  it('renders one inspect button for blocked file messages', () => {
+    const messagesCss = readFileSync(new URL('../../../styles/messages.css', import.meta.url), 'utf8')
+    const html = renderToStaticMarkup(
+      <ChatMessage
+        copiedKey=""
+        fallbackModelName="GPT"
+        message={{
+          id: 44,
+          role: 'USER',
+          status: 'DLP_BLOCKED',
+          content: 'Pieces jointes: secret.txt',
+          dlpMaskedText: 'Token [OPENAI_API_KEY_1]',
+          dlpHighestSeverity: 'HIGH',
+          dlpDetectedTypes: ['openai_api_key'],
+          dlpMatches: [{ id: 'openai_api_key_1', type: 'openai_api_key', start: 6, end: 20, lineNumber: 1, placeholder: '[OPENAI_API_KEY_1]' }],
+          attachments: [{ id: 10, filename: 'secret.txt', size: 512, decision: 'BLOCK' }],
+        }}
+        onCopy={vi.fn()}
+        onInspectDocument={vi.fn()}
+        setCopiedKey={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Inspecter')
+    expect((html.match(/Inspecter/g) || [])).toHaveLength(1)
+    expect(html).not.toContain('Pieces jointes: secret.txt')
+    expect(html).not.toContain('Pièces jointes: secret.txt')
+    expect(html).not.toContain('Voir secret.txt')
+    expect(html).toContain('dlp-file-card')
+    expect(html).toContain('message user')
+    expect(html).toContain('role="button"')
+    expect(cssRule(messagesCss, '.file-message-card.is-clickable')).toMatch(/cursor:\s*pointer;/)
+    expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card')).toMatch(/border-color:\s*#FECACA;/)
+    expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card')).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.6\)/)
+    expect(html).not.toContain('OPENAI_API_KEY_1</span><span class="dlp-detection-type"')
+  })
 })
+
+function renderUserMessage(content) {
+  return renderToStaticMarkup(
+    <ChatMessage
+      copiedKey=""
+      fallbackModelName="GPT"
+      message={{
+        id: `user-${content.length}`,
+        role: 'USER',
+        status: 'TERMINE',
+        content,
+      }}
+      onCopy={vi.fn()}
+      setCopiedKey={vi.fn()}
+    />,
+  )
+}
+
+function cssRule(css, selector) {
+  const matches = [...css.matchAll(new RegExp(`${escapeRegExp(selector)}\\s*\\{([^}]*)\\}`, 'g'))]
+  expect(matches.length, `${selector} rule`).toBeGreaterThan(0)
+  return matches[matches.length - 1][1]
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

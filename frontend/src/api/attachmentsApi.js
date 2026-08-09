@@ -4,20 +4,20 @@ export function fetchAttachmentMetadata(id) {
   return apiFetch(`/attachments/${id}`)
 }
 
-export async function fetchAttachmentContent(id) {
-  const response = await apiFetchResponse(`/attachments/${id}/content`)
+export async function fetchAttachmentContent(id, options = {}) {
+  const response = await apiFetchResponse(`/attachments/${id}/content`, options)
   return {
     blob: await response.blob(),
     contentType: response.headers.get('content-type') || 'application/octet-stream',
   }
 }
 
-export function fetchAttachmentInspection(id) {
-  return apiFetch(`/attachments/${id}/inspection`)
+export function fetchAttachmentInspection(id, options = {}) {
+  return apiFetch(`/attachments/${id}/inspection`, options).then(normalizeAttachmentPayload)
 }
 
-export function fetchAttachmentSecure(id) {
-  return apiFetch(`/attachments/${id}/secure`)
+export function fetchAttachmentSecure(id, options = {}) {
+  return apiFetch(`/attachments/${id}/secure`, options).then(normalizeAttachmentPayload)
 }
 
 export async function downloadSecureAttachment(id) {
@@ -44,4 +44,16 @@ export function streamSecureAttachment(conversationId, attachmentId, signal) {
 function filenameFromDisposition(disposition) {
   const match = disposition.match(/filename="([^"]+)"/i)
   return match ? match[1] : ''
+}
+
+function normalizeAttachmentPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  return {
+    ...payload,
+    attachmentId: payload.attachmentId ?? payload.attachment_id ?? payload.id,
+    extractedText: payload.extractedText ?? payload.extracted_text ?? '',
+    extractionStatus: payload.extractionStatus ?? payload.extraction_status ?? '',
+    maskedText: payload.maskedText ?? payload.masked_text ?? '',
+    matches: Array.isArray(payload.matches) ? payload.matches : [],
+  }
 }

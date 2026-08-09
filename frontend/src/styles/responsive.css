@@ -59,7 +59,7 @@
 
   .composer-center,
   .sidebar-closed .composer-center {
-    left: calc(56px + (100vw - 56px) / 2);
+    left: 50%;
   }
 }
 

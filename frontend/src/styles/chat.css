@@ -123,9 +123,9 @@
 .go-bottom-button {
   position: absolute;
   z-index: 50;
-  right: 32px;
+  left: 50%;
   bottom: 100px;
-  transform: none;
+  transform: translateX(-50%);
   width: 34px;
   height: 32px;
   border: 1px solid rgba(218, 218, 218, 0.65);
@@ -142,8 +142,9 @@
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.sidebar-closed .go-bottom-button {
-  right: 32px;
+.sidebar-closed .go-bottom-button,
+.sidebar-open .go-bottom-button {
+  left: 50%;
 }
 
 .down-arrow-icon {

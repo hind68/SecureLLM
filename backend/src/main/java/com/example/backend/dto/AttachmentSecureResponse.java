@@ -1,7 +1,7 @@
 package com.example.backend.dto;
 
 public record AttachmentSecureResponse(
-        Long id,
+        Long attachmentId,
         String filename,
         String mimeType,
         String extractionStatus,

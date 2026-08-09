@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { PlusIcon, StopIcon } from '../../../components/common/icons'
 import FileAttachmentCard from './FileAttachmentCard'
 import { ACCEPTED_ATTACHMENT_EXTENSIONS, MAX_ATTACHMENTS } from '../hooks/useChatUi'
@@ -20,15 +21,32 @@ export default function ChatComposer({
   onStop,
   textareaRef,
 }) {
+  const [visibleAttachments, setVisibleAttachments] = useState(attachments)
+  const [hideComplete, setHideComplete] = useState(false)
+  const displayAttachments = attachments.length > 0 ? attachments : visibleAttachments
+  const isHidingAttachments = attachments.length === 0 && displayAttachments.length > 0 && !hideComplete
+
+  useEffect(() => {
+    if (attachments.length > 0) {
+      const frame = window.requestAnimationFrame(() => {
+        setVisibleAttachments(attachments)
+        setHideComplete(false)
+      })
+      return () => window.cancelAnimationFrame(frame)
+    }
+    const timeout = window.setTimeout(() => setHideComplete(true), 220)
+    return () => window.clearTimeout(timeout)
+  }, [attachments])
+
   return (
     <form
       ref={composerRef}
       className={`composer ${hasActiveMessages ? 'composer-bottom' : 'composer-welcome composer-center'} ${isComposerMaxed ? 'composer-maxed' : ''} ${isGenerating ? 'is-generating' : ''}`}
       onSubmit={onSubmit}
     >
-      {attachments.length > 0 && (
-        <div className="composer-attachments">
-          {attachments.map((file, index) => (
+      {displayAttachments.length > 0 && (attachments.length > 0 || !hideComplete) && (
+        <div className={`composer-attachments ${isHidingAttachments ? 'is-hiding' : ''}`}>
+          {displayAttachments.map((file, index) => (
             <FileAttachmentCard
               attachment={file}
               key={`${file.name}-${file.size}-${index}`}

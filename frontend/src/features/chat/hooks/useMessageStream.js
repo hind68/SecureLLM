@@ -130,7 +130,15 @@ export default function useMessageStream({
 
     updateConversationMessages(conversation.id, (current) => [
       ...current,
-      { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt, attachments: attachmentPreview(attachments) },
+      {
+        id: localUserId,
+        role: 'USER',
+        status: 'TERMINE',
+        content: prompt,
+        attachments: attachmentPreview(attachments),
+        modelAlias: conversation.modelAlias,
+        modelDisplayName: modelName,
+      },
       {
         id: localAssistantId,
         role: 'ASSISTANT',
@@ -216,7 +224,15 @@ export default function useMessageStream({
 
     updateConversationMessages(conversation.id, (current) => [
       ...current,
-      { id: localUserId, role: 'USER', status: 'TERMINE', content: prompt, attachments: [attachment] },
+      {
+        id: localUserId,
+        role: 'USER',
+        status: 'TERMINE',
+        content: prompt,
+        attachments: [attachment],
+        modelAlias: conversation.modelAlias,
+        modelDisplayName: modelName,
+      },
       {
         id: localAssistantId,
         role: 'ASSISTANT',

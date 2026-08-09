@@ -114,8 +114,9 @@ class DlpServiceTest {
         DlpSafeMessage safe = dlpService.safeMessageForLlm("Resume", files, "demo-user");
 
         assertThat(safe.safePrompt())
-                .contains("Message utilisateur :\nResume")
-                .contains("--- Fichier : client.txt ---")
+                .startsWith("Resume")
+                .contains("Contexte des pieces jointes")
+                .contains("[Fichier: client.txt]")
                 .contains("Contact [EMAIL_1]")
                 .doesNotContain("client@example.com");
         assertThat(safe.attachments()).hasSize(1);
@@ -148,11 +149,94 @@ class DlpServiceTest {
                 });
     }
 
+    @Test
+    void analyseMessageBuildsBlockedAttachmentMaskedTextWhenDlpOmitsIt() {
+        String extractedText = "Token sk-test-secret";
+        MockMultipartFile file = new MockMultipartFile("files", "secret.txt", "text/plain", extractedText.getBytes());
+        List<MultipartFile> files = List.of(file);
+        when(dlpClient.analyseMessage("", files, "demo-user"))
+                .thenReturn(new DlpMultiSourceAnalysisResponse(
+                        "SUCCESS",
+                        DlpDecision.BLOCK,
+                        true,
+                        "high",
+                        List.of(new DlpSourceResult("secret.txt", "SUCCESS", DlpDecision.BLOCK, true, "high", extractedText, null, List.of(
+                                new DlpMatch("openai_api_key_1", "openai_api_key", 6, 20, "high", "regex", 1.0, null)
+                        ), List.of())),
+                        List.of()
+                ));
+
+        assertThatThrownBy(() -> dlpService.safeMessageForLlm("", files, "demo-user"))
+                .isInstanceOf(DlpBlockedException.class)
+                .satisfies(exception -> {
+                    DlpBlockedException blocked = (DlpBlockedException) exception;
+                    assertThat(blocked.getAttachments()).hasSize(1);
+                    assertThat(blocked.getAttachments().get(0).maskedText()).isEqualTo("Token [OPENAI_API_KEY_1]");
+                });
+    }
+
+    @Test
+    void analyseMessageCalculatesAttachmentLineNumbersFromOriginalExtractedText() {
+        String extractedText = String.join("\n",
+                "Adresse IP 10.0.0.1",
+                "Email admin@example.com",
+                "Token sk-test-secret",
+                "Connexion postgres://user:pass@localhost/db",
+                "CIN AB123456"
+        );
+        String maskedText = String.join("\n",
+                "Adresse IP [IP_ADDRESS_1]",
+                "Email [EMAIL_1]",
+                "Token [OPENAI_API_KEY_1]",
+                "Connexion [CONNECTION_STRING_1]",
+                "CIN [MOROCCAN_CIN_1]"
+        );
+        List<DlpMatch> matches = List.of(
+                matchAt("ip_address_1", "ip_address", extractedText, "10.0.0.1"),
+                matchAt("email_1", "email", extractedText, "admin@example.com"),
+                matchAt("openai_api_key_1", "openai_api_key", extractedText, "sk-test-secret"),
+                matchAt("connection_string_1", "connection_string", extractedText, "postgres://user:pass@localhost/db"),
+                matchAt("moroccan_cin_1", "moroccan_cin", extractedText, "AB123456")
+        );
+        MockMultipartFile file = new MockMultipartFile("files", "multi.txt", "text/plain", extractedText.getBytes());
+        List<MultipartFile> files = List.of(file);
+        when(dlpClient.analyseMessage("", files, "demo-user"))
+                .thenReturn(new DlpMultiSourceAnalysisResponse(
+                        "SUCCESS",
+                        DlpDecision.BLOCK,
+                        true,
+                        "high",
+                        List.of(new DlpSourceResult("multi.txt", "SUCCESS", DlpDecision.BLOCK, true, "high", extractedText, maskedText, matches, List.of())),
+                        List.of()
+                ));
+
+        assertThatThrownBy(() -> dlpService.safeMessageForLlm("", files, "demo-user"))
+                .isInstanceOf(DlpBlockedException.class)
+                .satisfies(exception -> {
+                    DlpBlockedException blocked = (DlpBlockedException) exception;
+                    assertThat(blocked.getAttachments()).hasSize(1);
+                    assertThat(blocked.getAttachments().get(0).matches())
+                            .extracting("id", "lineNumber")
+                            .containsExactly(
+                                    org.assertj.core.groups.Tuple.tuple("ip_address_1", 1),
+                                    org.assertj.core.groups.Tuple.tuple("email_1", 2),
+                                    org.assertj.core.groups.Tuple.tuple("openai_api_key_1", 3),
+                                    org.assertj.core.groups.Tuple.tuple("connection_string_1", 4),
+                                    org.assertj.core.groups.Tuple.tuple("moroccan_cin_1", 5)
+                            );
+                });
+    }
+
     private DlpAnalysisResponse response(DlpDecision decision, String maskedText, List<DlpMatch> matches) {
         return new DlpAnalysisResponse("SUCCESS", decision, false, "HIGH", maskedText, maskedText, matches, List.of());
     }
 
     private DlpSourceResult source(String source, DlpDecision decision, String maskedText, List<DlpMatch> matches) {
         return new DlpSourceResult(source, "SUCCESS", decision, !matches.isEmpty(), null, maskedText, maskedText, matches, List.of());
+    }
+
+    private DlpMatch matchAt(String id, String type, String text, String value) {
+        int start = text.indexOf(value);
+        return new DlpMatch(id, type, start, start + value.length(), "high", "regex", 1.0, null);
     }
 }

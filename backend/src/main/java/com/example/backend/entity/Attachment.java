@@ -128,6 +128,10 @@ public class Attachment {
         return maskedText;
     }
 
+    public void setMaskedText(String maskedText) {
+        this.maskedText = maskedText;
+    }
+
     public String getMatchesJson() {
         return matchesJson;
     }
