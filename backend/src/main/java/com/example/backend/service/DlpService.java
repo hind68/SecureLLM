@@ -312,7 +312,10 @@ public class DlpService {
     }
 
     private Integer lineNumber(String text, Integer start) {
-        if (text == null || start == null || start <= 0) {
+        if (text == null || start == null || start < 0 || start > text.length()) {
+            return null;
+        }
+        if (start == 0) {
             return 1;
         }
         int boundedStart = Math.min(start, text.length());

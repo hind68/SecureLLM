@@ -178,24 +178,42 @@ class DlpServiceTest {
     @Test
     void analyseMessageCalculatesAttachmentLineNumbersFromOriginalExtractedText() {
         String extractedText = String.join("\n",
-                "Adresse IP 10.0.0.1",
+                "line 1",
+                "line 2",
                 "Email admin@example.com",
+                "line 4",
+                "line 5",
+                "line 6",
+                "line 7",
                 "Token sk-test-secret",
-                "Connexion postgres://user:pass@localhost/db",
+                "line 9",
+                "line 10",
+                "line 11",
+                "line 12",
+                "line 13",
+                "line 14",
                 "CIN AB123456"
         );
         String maskedText = String.join("\n",
-                "Adresse IP [IP_ADDRESS_1]",
+                "line 1",
+                "line 2",
                 "Email [EMAIL_1]",
+                "line 4",
+                "line 5",
+                "line 6",
+                "line 7",
                 "Token [OPENAI_API_KEY_1]",
-                "Connexion [CONNECTION_STRING_1]",
+                "line 9",
+                "line 10",
+                "line 11",
+                "line 12",
+                "line 13",
+                "line 14",
                 "CIN [MOROCCAN_CIN_1]"
         );
         List<DlpMatch> matches = List.of(
-                matchAt("ip_address_1", "ip_address", extractedText, "10.0.0.1"),
                 matchAt("email_1", "email", extractedText, "admin@example.com"),
                 matchAt("openai_api_key_1", "openai_api_key", extractedText, "sk-test-secret"),
-                matchAt("connection_string_1", "connection_string", extractedText, "postgres://user:pass@localhost/db"),
                 matchAt("moroccan_cin_1", "moroccan_cin", extractedText, "AB123456")
         );
         MockMultipartFile file = new MockMultipartFile("files", "multi.txt", "text/plain", extractedText.getBytes());
@@ -218,13 +236,46 @@ class DlpServiceTest {
                     assertThat(blocked.getAttachments().get(0).matches())
                             .extracting("id", "lineNumber")
                             .containsExactly(
-                                    org.assertj.core.groups.Tuple.tuple("ip_address_1", 1),
-                                    org.assertj.core.groups.Tuple.tuple("email_1", 2),
-                                    org.assertj.core.groups.Tuple.tuple("openai_api_key_1", 3),
-                                    org.assertj.core.groups.Tuple.tuple("connection_string_1", 4),
-                                    org.assertj.core.groups.Tuple.tuple("moroccan_cin_1", 5)
+                                    org.assertj.core.groups.Tuple.tuple("email_1", 3),
+                                    org.assertj.core.groups.Tuple.tuple("openai_api_key_1", 8),
+                                    org.assertj.core.groups.Tuple.tuple("moroccan_cin_1", 15)
                             );
                 });
+    }
+
+    @Test
+    void analyseMessageKeepsExtractedTextForPdfAndDocxAttachments() {
+        MockMultipartFile pdf = new MockMultipartFile("files", "report.pdf", "application/pdf", "pdf".getBytes());
+        MockMultipartFile docx = new MockMultipartFile("files", "contract.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx".getBytes());
+        List<MultipartFile> files = List.of(pdf, docx);
+        String pdfText = "PDF email admin@example.com";
+        String docxText = "DOCX token sk-test-secret";
+        when(dlpClient.analyseMessage("", files, "demo-user"))
+                .thenReturn(new DlpMultiSourceAnalysisResponse(
+                        "SUCCESS",
+                        DlpDecision.MASK,
+                        true,
+                        "high",
+                        List.of(
+                                new DlpSourceResult("report.pdf", "SUCCESS", DlpDecision.MASK, true, "medium", pdfText, "PDF email [EMAIL_1]", List.of(
+                                        matchAt("email_1", "email", pdfText, "admin@example.com")
+                                ), List.of()),
+                                new DlpSourceResult("contract.docx", "SUCCESS", DlpDecision.MASK, true, "high", docxText, "DOCX token [OPENAI_API_KEY_1]", List.of(
+                                        matchAt("openai_api_key_1", "openai_api_key", docxText, "sk-test-secret")
+                                ), List.of())
+                        ),
+                        List.of()
+                ));
+
+        DlpSafeMessage safe = dlpService.safeMessageForLlm("", files, "demo-user");
+
+        assertThat(safe.attachments()).hasSize(2);
+        assertThat(safe.attachments())
+                .extracting("filename", "extractedText", "maskedText")
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("report.pdf", pdfText, "PDF email [EMAIL_1]"),
+                        org.assertj.core.groups.Tuple.tuple("contract.docx", docxText, "DOCX token [OPENAI_API_KEY_1]")
+                );
     }
 
     private DlpAnalysisResponse response(DlpDecision decision, String maskedText, List<DlpMatch> matches) {

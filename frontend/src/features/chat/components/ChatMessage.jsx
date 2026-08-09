@@ -245,7 +245,7 @@ function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDoc
   const attachment = attachments.find((item) => item?.decision === 'BLOCK') || attachments[0]
   if (!attachment) return
   const attachmentMatches = matches.filter((match) => (
-    !match.attachmentId || !attachment.id || match.attachmentId === attachment.id || match.source === attachment.filename
+    matchesAttachment(match, attachment)
   ))
   onInspectDocument?.({
     attachment,
@@ -254,6 +254,24 @@ function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDoc
     matches: attachmentMatches,
     requestedView: 'detected',
   })
+}
+
+function matchesAttachment(match, attachment) {
+  const attachmentId = attachment?.id == null ? '' : String(attachment.id)
+  const idMatches = match?.attachmentId != null && attachmentId && String(match.attachmentId) === attachmentId
+  const sourceNames = [attachment?.filename, attachment?.name, attachment?.source]
+    .filter(Boolean)
+    .flatMap(sourceAliases)
+  const sourceMatches = match?.source && sourceAliases(match.source).some((source) => sourceNames.includes(source))
+  if (idMatches || sourceMatches) return true
+  return !match?.attachmentId && !match?.source
+}
+
+function sourceAliases(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return []
+  const basename = normalized.split(/[\\/]/).pop()
+  return [...new Set([normalized, basename].map((item) => item.toLowerCase()))]
 }
 
 function displayableMessageContent(message) {

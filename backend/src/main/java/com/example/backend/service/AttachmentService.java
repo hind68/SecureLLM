@@ -272,13 +272,11 @@ public class AttachmentService {
     }
 
     private List<DlpPublicMatch> responseMatches(Long attachmentId, String source, String extractedText, List<DlpPublicMatch> matches) {
-        if (extractedText == null || extractedText.isEmpty()) {
+        if (matches == null || matches.isEmpty()) {
             return List.of();
         }
-        int textLength = extractedText.length();
+        String text = extractedText == null ? "" : extractedText;
         return matches.stream()
-                .filter(match -> match.start() != null && match.end() != null)
-                .filter(match -> match.start() >= 0 && match.end() > match.start() && match.end() <= textLength)
                 .map(match -> new DlpPublicMatch(
                         attachmentId,
                         source,
@@ -286,11 +284,21 @@ public class AttachmentService {
                         match.type(),
                         match.start(),
                         match.end(),
-                        lineNumber(extractedText, match.start()),
+                        safeLineNumber(text, match),
                         match.severity(),
                         match.placeholder()
                 ))
                 .toList();
+    }
+
+    private Integer safeLineNumber(String text, DlpPublicMatch match) {
+        if (text != null && !text.isEmpty() && match.start() != null && match.start() >= 0 && match.start() <= text.length()) {
+            return lineNumber(text, match.start());
+        }
+        if (match.lineNumber() != null && match.lineNumber() > 1) {
+            return match.lineNumber();
+        }
+        return null;
     }
 
     private String ensureMaskedText(Attachment attachment) {
@@ -321,7 +329,10 @@ public class AttachmentService {
     }
 
     private Integer lineNumber(String text, Integer start) {
-        if (text == null || start == null || start <= 0) {
+        if (text == null || start == null || start < 0 || start > text.length()) {
+            return null;
+        }
+        if (start == 0) {
             return 1;
         }
         int boundedStart = Math.min(start, text.length());

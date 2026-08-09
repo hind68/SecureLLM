@@ -221,6 +221,111 @@ describe('ChatMessage', () => {
     expect(html).toContain('Email admin@example.com')
   })
 
+  it('calculates threat lines from extracted text offsets and wires cards to highlights', () => {
+    const text = [
+      'line 1',
+      'line 2',
+      'Email admin@example.com',
+      'line 4',
+      'line 5',
+      'line 6',
+      'line 7',
+      'Token sk-test-secret',
+      'line 9',
+      'line 10',
+      'line 11',
+      'line 12',
+      'line 13',
+      'line 14',
+      'CIN AB123456',
+    ].join('\n')
+    const matches = [
+      matchAt('email_1', 'email', text, 'admin@example.com', 1),
+      matchAt('openai_api_key_1', 'openai_api_key', text, 'sk-test-secret', 1),
+      matchAt('moroccan_cin_1', 'moroccan_cin', text, 'AB123456', 1),
+    ]
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'multiline.txt', decision: 'BLOCK' },
+          extractedText: text,
+          requestedView: 'detected',
+          matches,
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Ligne 3')
+    expect(html).toContain('Ligne 8')
+    expect(html).toContain('Ligne 15')
+    expect(html).not.toContain('Ligne 1</small>')
+    expect(html).toContain('data-target-match-id="email_1"')
+    expect(html).toContain('data-match-id="email_1"')
+    expect(html).toContain('data-target-match-id="openai_api_key_1"')
+    expect(html).toContain('data-match-id="openai_api_key_1"')
+    expect(html).toContain('data-target-match-id="moroccan_cin_1"')
+    expect(html).toContain('data-match-id="moroccan_cin_1"')
+  })
+
+  it('shows unknown line instead of silently falling back to line one', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'unknown.txt', decision: 'BLOCK' },
+          extractedText: 'short text',
+          requestedView: 'detected',
+          matches: [
+            { id: 'bad_offset_1', attachmentId: 12, source: 'unknown.txt', type: 'email', start: 200, end: 220, lineNumber: 1, severity: 'medium', placeholder: '[EMAIL_1]' },
+          ],
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Ligne inconnue')
+    expect(html).not.toContain('Ligne 1</small>')
+  })
+
+  it('shows a localization error when DLP matches have no extracted text', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'blocked.txt', decision: 'BLOCK' },
+          requestedView: 'detected',
+          matches: [
+            { id: 'email_1', attachmentId: 12, source: 'blocked.txt', type: 'email', start: 0, end: 18, lineNumber: 1, severity: 'medium', placeholder: '[EMAIL_1]' },
+          ],
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Menaces (1)')
+    expect(html).toContain('Localisation indisponible')
+    expect(html).toContain('Adresse e-mail')
+    expect(html).not.toContain('Menaces (0)')
+  })
+
+  it('does not fall back to the original preview text in the threats tab', () => {
+    const html = renderToStaticMarkup(
+      <DocumentInspectorPanel
+        attachment={{
+          attachment: { id: 12, filename: 'blocked.pdf', decision: 'BLOCK' },
+          extractedText: '',
+          requestedView: 'detected',
+          matches: [
+            { id: 'email_1', attachmentId: 12, source: 'blocked.pdf', type: 'email', start: 1200, end: 1218, lineNumber: 8, severity: 'medium', placeholder: '[EMAIL_1]' },
+          ],
+        }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(html).toContain('Localisation indisponible')
+    expect(html).not.toContain('Extraction rÃ©ussie, mais aucun texte lisible')
+  })
+
   it('renders the file secure version placeholders instead of attachment summary text', () => {
     const html = renderToStaticMarkup(
       <DocumentInspectorPanel
@@ -395,6 +500,21 @@ function renderUserMessage(content) {
       setCopiedKey={vi.fn()}
     />,
   )
+}
+
+function matchAt(id, type, text, value, lineNumber = 1) {
+  const start = text.indexOf(value)
+  return {
+    id,
+    attachmentId: 12,
+    source: 'multiline.txt',
+    type,
+    start,
+    end: start + value.length,
+    lineNumber,
+    severity: 'high',
+    placeholder: `[${id.toUpperCase()}]`,
+  }
 }
 
 function cssRule(css, selector) {

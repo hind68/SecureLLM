@@ -7,8 +7,15 @@ import {
   fetchAttachmentSecure,
 } from '../../../api/attachmentsApi'
 import { CopyIcon } from '../../../components/common/icons'
+import { CODE_EXTENSIONS, TEXT_EXTENSIONS, fileExtension } from '../utils/attachmentFiles'
 
-const TEXT_EXTENSIONS = new Set(['txt', 'log', 'md', 'csv', 'json', 'xml', 'yaml', 'yml', 'js', 'jsx', 'ts', 'tsx', 'java', 'py', 'properties', 'env', 'ini', 'conf'])
+const TEXT_LIKE_EXTENSIONS = new Set([
+  ...TEXT_EXTENSIONS,
+  ...CODE_EXTENSIONS,
+  '.csv',
+  '.properties',
+  '.env',
+].map((extension) => extension.slice(1)))
 const PREVIEW_UNAVAILABLE = 'Format non prévisualisable'
 const EXTRACTION_UNAVAILABLE = 'Extraction impossible'
 
@@ -250,7 +257,7 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
         <div className="document-zoom-shell">
           <article className={pageClass} style={readerStyle}>
             {activeTab === 'original' && <OriginalDocumentView documentState={originalState} extractedText={inspectionState.text || target.extractedText} extractionLoading={inspectionState.loading} />}
-            {activeTab === 'detected' && <InspectionDocumentView state={{ ...inspectionState, matches: visibleMatches, text: inspectionState.text || originalState.text || target.extractedText }} />}
+            {activeTab === 'detected' && <InspectionDocumentView state={{ ...inspectionState, matches: visibleMatches, text: inspectionState.text || target.extractedText }} />}
             {activeTab === 'secure' && <SecureDocumentView state={secureState} />}
           </article>
         </div>
@@ -309,13 +316,33 @@ function PdfFallback({ text }) {
 
 function InspectionDocumentView({ state }) {
   const [selectedMatchId, setSelectedMatchId] = useState('')
+  const hasMatches = Array.isArray(state.matches) && state.matches.length > 0
+  const highlightableMatches = filterHighlightableMatches(state.matches, state.text)
   if (state.loading) return <LoadingState label="Analyse de sécurité en cours…" />
   if (state.error) return <p>{state.error}</p>
+  if (!state.text && hasMatches) {
+    return (
+      <DetectionIssueState
+        matches={state.matches}
+        message="Le DLP a detecte des donnees sensibles, mais le texte extrait n'a pas ete conserve pour localiser les positions."
+      />
+    )
+  }
   if (!state.text && String(state.status).toUpperCase() === 'SUCCESS') return <p>Extraction réussie, mais aucun texte lisible n'a été retourné pour ce fichier.</p>
   if (!state.text && state.matches?.length) return <p>Le texte extrait du fichier n'a pas été retrouvé pour ces détections.</p>
   if (!state.text) return <p>L'extraction du texte n'est pas disponible.</p>
 
-  const rows = lineRows(state.text, state.matches)
+  if (hasMatches && highlightableMatches.length === 0) {
+    return (
+      <DetectionIssueState
+        matches={state.matches}
+        message="Le DLP a detecte des donnees sensibles, mais leurs positions ne correspondent pas au texte extrait affichable."
+        text={state.text}
+      />
+    )
+  }
+
+  const rows = lineRows(state.text, highlightableMatches)
   function selectMatch(match) {
     const id = matchKey(match)
     setSelectedMatchId(id)
@@ -325,7 +352,7 @@ function InspectionDocumentView({ state }) {
 
   return (
     <div className="document-detected-layout">
-      <DetectionIndex matches={state.matches} text={state.text} onSelect={selectMatch} />
+      <DetectionIndex matches={highlightableMatches} text={state.text} onSelect={selectMatch} />
       <div className="document-inspection-code">
         {rows.map((line) => (
           <div className="document-line" key={line.number}>
@@ -334,6 +361,17 @@ function InspectionDocumentView({ state }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function DetectionIssueState({ matches, message, text = '' }) {
+  return (
+    <div className="document-empty-state">
+      <span aria-hidden="true">!</span>
+      <strong>Localisation indisponible</strong>
+      <p>{message}</p>
+      <DetectionIndex matches={matches} text={text} onSelect={() => undefined} />
     </div>
   )
 }
@@ -380,14 +418,17 @@ function DetectionIndex({ matches, text, onSelect }) {
   if (!Array.isArray(matches) || matches.length === 0) return null
   return (
     <div className="document-threat-list" aria-label="Liste des menaces détectées">
-      {matches.map((match, index) => (
-        <button type="button" key={matchKey(match, index)} onClick={() => onSelect(match)}>
-          <strong>{displaySeverity(match.severity)}</strong>
-          <span>{displayTypeFr(match.type)}</span>
-          <small>Ligne {lineNumberForMatch(text, match)}</small>
-          <em>{contextForMatch(text, match)}</em>
-        </button>
-      ))}
+      {matches.map((match, index) => {
+        const id = matchKey(match)
+        return (
+          <button type="button" key={`${id}-${index}`} data-target-match-id={id} onClick={() => onSelect(match)}>
+            <strong>{displaySeverity(match.severity)}</strong>
+            <span>{displayTypeFr(match.type)}</span>
+            <small>Ligne {lineNumberForMatch(text, match)}</small>
+            <em>{contextForMatch(text, match)}</em>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -404,6 +445,8 @@ function lineRows(text, matches) {
       .filter((match) => match.end > start && match.start < end)
       .map((match) => ({
         ...match,
+        absoluteStart: match.absoluteStart ?? match.start,
+        absoluteEnd: match.absoluteEnd ?? match.end,
         start: Math.max(match.start, start) - start,
         end: Math.min(match.end, end) - start,
       }))
@@ -504,12 +547,28 @@ function filterMatchesForAttachment(matches, attachment) {
     attachment?.filename,
     attachment?.name,
     attachment?.source,
-  ].filter(Boolean).map((value) => String(value)))
+  ].filter(Boolean).flatMap(sourceAliases))
   return matches.filter((match) => {
-    if (match.attachmentId != null && attachmentId) return String(match.attachmentId) === attachmentId
-    if (match.source && sourceNames.size > 0) return sourceNames.has(String(match.source))
+    const idMatches = match.attachmentId != null && attachmentId && String(match.attachmentId) === attachmentId
+    const sourceMatches = match.source && sourceNames.size > 0 && sourceAliases(match.source).some((source) => sourceNames.has(source))
+    if (idMatches || sourceMatches) return true
+    if (match.attachmentId != null || match.source) return false
     return !match.attachmentId && !match.source
   })
+}
+
+function sourceAliases(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return []
+  const basename = normalized.split(/[\\/]/).pop()
+  return [...new Set([normalized, basename].map((item) => item.toLowerCase()))]
+}
+
+function filterHighlightableMatches(matches, text) {
+  const length = String(text || '').length
+  return (matches || [])
+    .filter((match) => Number.isInteger(match.start) && Number.isInteger(match.end))
+    .filter((match) => match.start >= 0 && match.end > match.start && match.end <= length)
 }
 
 function severityClass(match) {
@@ -541,7 +600,9 @@ function displaySeverity(severity) {
 }
 
 function matchKey(match, fallback = '') {
-  return String(match?.id || `${match?.attachmentId || ''}-${match?.source || ''}-${match?.start || 0}-${match?.end || 0}-${fallback}`)
+  const start = match?.absoluteStart ?? match?.start ?? 'unknown'
+  const end = match?.absoluteEnd ?? match?.end ?? 'unknown'
+  return String(match?.id || `${match?.attachmentId || ''}-${match?.source || ''}-${start}-${end}-${fallback}`)
 }
 
 function renderSecureText(text) {
@@ -570,9 +631,15 @@ function contextForMatch(text, match) {
 }
 
 function lineNumberForMatch(text, match) {
-  if (Number.isInteger(match?.start) && text) return String(text || '').slice(0, match.start).split('\n').length
+  const value = String(text || '')
+  if (Number.isInteger(match?.start)) {
+    if (value && match.start >= 0 && match.start <= value.length) {
+      return value.slice(0, match.start).split('\n').length
+    }
+    return Number.isInteger(match?.lineNumber) && match.lineNumber > 1 ? match.lineNumber : 'inconnue'
+  }
   if (Number.isInteger(match?.lineNumber) && match.lineNumber > 0) return match.lineNumber
-  return 1
+  return 'inconnue'
 }
 
 function lineTextForOffset(text, offset) {
@@ -586,7 +653,7 @@ function lineTextForOffset(text, offset) {
 
 function isTextLike(extension, contentType = '') {
   const normalized = String(contentType).toLowerCase()
-  return TEXT_EXTENSIONS.has(extension) || normalized.startsWith('text/') || normalized.includes('json') || normalized.includes('xml')
+  return TEXT_LIKE_EXTENSIONS.has(extension) || normalized.startsWith('text/') || normalized.includes('json') || normalized.includes('xml')
 }
 
 function isPdf(extension, contentType = '') {
@@ -625,11 +692,6 @@ async function previewStateFromBlob(blob, filename, contentType, fallbackText) {
 
 function fallbackOriginalState(text, status = PREVIEW_UNAVAILABLE) {
   return { error: '', html: '', kind: 'text', loading: false, status: text ? '' : status, text: text || '', url: '' }
-}
-
-function fileExtension(filename) {
-  const match = String(filename || '').match(/\.([a-z0-9]+)$/i)
-  return match ? match[1].toLowerCase() : ''
 }
 
 function filenameWithoutExtension(filename) {

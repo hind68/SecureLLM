@@ -3,16 +3,10 @@ import useAutoScroll from './useAutoScroll'
 import useMessageStream from './useMessageStream'
 import { logDevelopmentError } from '../../../utils/errors'
 import { focusTextareaOnNextFrame, shouldFocusComposer } from '../utils/composerFocus'
+import { ACCEPTED_ATTACHMENT_EXTENSIONS } from '../utils/attachmentFiles'
 
 export const MAX_ATTACHMENTS = Number.POSITIVE_INFINITY
-export const ACCEPTED_ATTACHMENT_EXTENSIONS = [
-  '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
-  '.docx', '.pptx', '.csv', '.xlsx', '.zip',
-  '.txt', '.md', '.log', '.py', '.pyw', '.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.java',
-  '.js', '.jsx', '.ts', '.tsx', '.go', '.rb', '.php', '.rs', '.swift', '.kt', '.kts',
-  '.scala', '.sh', '.bash', '.ps1', '.sql', '.r', '.ini', '.cfg', '.conf', '.toml',
-  '.yml', '.yaml', '.json', '.xml', '.html', '.htm', '.css',
-]
+export { ACCEPTED_ATTACHMENT_EXTENSIONS }
 
 /**
  * Groups the chat surface state that is independent from conversation CRUD.

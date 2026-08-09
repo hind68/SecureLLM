@@ -1,13 +1,4 @@
-const FILE_ICON_META = {
-  doc: '/assets/doc.png',
-  docx: '/assets/doc.png',
-  pdf: '/assets/pdf.png',
-  ppt: '/assets/ppt.png',
-  pptx: '/assets/ppt.png',
-  xls: '/assets/sheets.png',
-  xlsx: '/assets/sheets.png',
-  zip: '/assets/zip.png',
-}
+import { getAttachmentIconSrc } from '../utils/attachmentFiles'
 
 export default function FileAttachmentCard({ attachment, hideActions = false, hideViewButton = false, variant = 'message', onAction, onInspect, onRemove }) {
   const filename = attachment?.filename || attachment?.name || 'Fichier'
@@ -68,8 +59,7 @@ function emitAction(onAction, onInspect, attachment, mode) {
 }
 
 function getFileIcon(filename, size = 32) {
-  const extension = fileExtension(filename)
-  const src = FILE_ICON_META[extension] || '/assets/document.png'
+  const src = getAttachmentIconSrc(filename)
   return (
     <img
       className="file-type-icon"
@@ -86,9 +76,4 @@ function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} o`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
-}
-
-function fileExtension(filename) {
-  const match = String(filename || '').toLowerCase().match(/\.([a-z0-9]+)$/)
-  return match ? match[1] : ''
 }
