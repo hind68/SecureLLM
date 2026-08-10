@@ -45,16 +45,18 @@ export default function ChatComposer({
       onSubmit={onSubmit}
     >
       {displayAttachments.length > 0 && (attachments.length > 0 || !hideComplete) && (
-        <div className={`composer-attachments ${isHidingAttachments ? 'is-hiding' : ''}`}>
-          {displayAttachments.map((file, index) => (
-            <FileAttachmentCard
-              attachment={file}
-              key={`${file.name}-${file.size}-${index}`}
-              onInspect={onInspectDocument}
-              onRemove={() => !isGenerating && onRemoveFile(index)}
-              variant="chip"
-            />
-          ))}
+        <div className={`composer-attachments-wrapper ${isHidingAttachments ? 'is-hiding' : ''}`}>
+          <div className="composer-attachments">
+            {displayAttachments.map((file, index) => (
+              <FileAttachmentCard
+                attachment={file}
+                key={`${file.name}-${file.size}-${index}`}
+                onInspect={onInspectDocument}
+                onRemove={() => !isGenerating && onRemoveFile(index)}
+                variant="chip"
+              />
+            ))}
+          </div>
           <button
             className="clear-attachments"
             type="button"
