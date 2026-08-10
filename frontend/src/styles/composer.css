@@ -212,9 +212,10 @@
 
 .attachment-chip {
   position: relative;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
+  width: var(--attachment-card-width);
+  min-width: var(--attachment-card-width);
+  max-width: var(--attachment-card-width);
+  flex: 0 0 var(--attachment-card-width);
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -229,20 +230,24 @@
 
 .attachment-chip-copy {
   min-width: 0;
+  max-width: 100%;
   display: grid;
   gap: 2px;
+  overflow: hidden;
 }
 
 .attachment-name {
-  max-width: 260px;
+  max-width: 100%;
   min-width: 0;
   color: #111827;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  word-break: break-word;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .attachment-size {
@@ -252,8 +257,9 @@
 }
 
 .attachment-chip .file-type-icon {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
 }
 
 .composer .attach-button {
@@ -488,11 +494,10 @@
 }
 
 .attachment-chip {
-  width: auto;
-  min-width: 0;
-  max-width: 220px;
-  flex: 0 0 clamp(150px, 30%, 220px);
-  flex-shrink: 0;
+  width: var(--attachment-card-width);
+  min-width: var(--attachment-card-width);
+  max-width: var(--attachment-card-width);
+  flex: 0 0 var(--attachment-card-width);
 }
 
 .attachment-chip-copy {

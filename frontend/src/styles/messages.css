@@ -1,4 +1,8 @@
 ﻿/* Message bubbles */
+:root {
+  --attachment-card-width: 220px;
+}
+
 .message {
   width: min(var(--chat-content-width), calc(100% - 36px));
   display: flex;
@@ -529,8 +533,9 @@
 }
 
 .file-message-card {
-  width: fit-content;
-  max-width: 100%;
+  width: var(--attachment-card-width);
+  min-width: var(--attachment-card-width);
+  max-width: var(--attachment-card-width);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -540,6 +545,7 @@
   padding: 8px 12px;
   margin-bottom: 4px;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .file-message-card.is-clickable {
@@ -560,15 +566,20 @@
 
 .file-message-copy {
   min-width: 0;
+  max-width: 100%;
   display: grid;
   gap: 2px;
+  overflow: hidden;
 }
 
 .file-message-copy strong {
-  max-width: 260px;
+  max-width: 100%;
   min-width: 0;
-  word-break: break-word;
-  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
   line-height: 1.4;
   color: #111827;
   font-size: 13px;
@@ -576,7 +587,7 @@
 }
 
 .dlp-file-panel .file-message-copy strong {
-  max-width: 150px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -590,15 +601,15 @@
 }
 
 .file-type-icon {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
-  flex: 0 0 auto;
+  flex: 0 0 32px;
 }
 
 .file-message-card .file-type-icon {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
 }
 
 .file-message-card .attachment-actions {
@@ -906,9 +917,9 @@
 }
 
 .file-message-card {
-  width: min(280px, 100%);
-  max-width: 100%;
-  min-width: 0;
+  width: var(--attachment-card-width);
+  min-width: var(--attachment-card-width);
+  max-width: var(--attachment-card-width);
   overflow: hidden;
 }
 
@@ -928,6 +939,7 @@
 
 .dlp-file-panel .file-message-card.dlp-file-card {
   width: 100%;
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   border-color: #FECACA;
