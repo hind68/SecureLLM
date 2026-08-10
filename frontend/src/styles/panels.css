@@ -1856,13 +1856,10 @@
   flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 8px;
-  max-height: 8rem;
   margin: 0;
   background: transparent;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   padding: 0;
-  scrollbar-width: thin;
 }
 
 .document-threat-list button,
@@ -2010,14 +2007,14 @@
 
 /* Final compact inspector header */
 .document-inspector-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  min-height: 56px;
-  border-bottom: 1px solid #E2E8F0;
+  min-height: 48px;
+  border-bottom: 0;
   background: #FFFFFF;
-  padding: 10px 12px;
+  padding: 8px 12px 4px;
 }
 
 .document-inspector-title {
@@ -2050,19 +2047,23 @@
 .document-header-tabs {
   width: max-content;
   flex-shrink: 0;
-  justify-self: end;
-  margin: 0;
+  margin: 0 auto;
   max-width: 100%;
 }
 
 .document-header-tabs button {
   flex: 0 0 auto;
-  padding-inline: 10px;
+  padding-inline: 14px;
   white-space: nowrap;
 }
 
 .document-segmented-row {
-  display: none !important;
+  display: flex !important;
+  flex: 0 0 auto;
+  justify-content: center;
+  border-bottom: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  padding: 2px 12px 8px;
 }
 
 .document-inspector-header-actions {
@@ -2083,55 +2084,141 @@
 }
 
 .document-text-size-trigger {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0;
 }
 
 .document-text-size-popover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   z-index: 20;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid #E2E8F0;
+  gap: 0;
+  border: 0;
   border-radius: 8px;
-  background: #FFFFFF;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
-  padding: 6px;
+  background: #F3F4F6;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  padding: 4px;
+  max-width: min(168px, calc(100vw - 24px));
+  overflow: hidden;
   white-space: nowrap;
 }
 
 .document-text-size-popover button {
   border: 0;
-  border-radius: 6px;
-  background: #F8FAFC;
-  color: #334155;
+  border-radius: 0;
+  background: transparent;
+  color: #6B7280;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
-  padding: 7px 8px;
+  padding: 6px 9px;
 }
 
 .document-text-size-popover button:hover {
-  background: #E2E8F0;
+  background: #FFFFFF;
+  color: #111827;
 }
 
-.document-text-size-popover span {
-  color: #475569;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1;
-  min-width: 38px;
+.document-text-size-popover button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.document-text-size-popover button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.document-text-size-popover button + button {
+  border-left: 1px solid #E5E7EB;
+}
+
+.document-text-size-popover .document-text-size-value {
+  min-width: 48px;
+  color: #111827;
+  font-weight: 600;
   text-align: center;
+}
+
+.document-inspector-panel,
+.document-inspector-viewer,
+.document-zoom-shell,
+.document-text-page,
+.document-detected-layout,
+.document-line,
+.document-line code {
+  min-width: 0;
+}
+
+.document-line code,
+.document-original-code,
+.document-inspection-code,
+.document-secure-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+/* Final responsive reader flow: keep line numbers fixed and content wrapping. */
+.document-original-code .document-line,
+.document-inspection-code .document-line,
+.document-secure-text .document-line {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0;
+  min-width: 0;
+}
+
+.document-line-number,
+.document-original-code .document-line-number,
+.document-inspection-code .document-line-number,
+.document-secure-text .document-line-number {
+  grid-column: 1;
+  width: auto;
+  min-width: 0;
+  max-width: 48px;
+  padding-right: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.document-original-code .document-line code,
+.document-inspection-code .document-line code,
+.document-secure-text .document-line code {
+  grid-column: 2;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+.document-dlp-mark,
+.document-dlp-mark.severity-low,
+.document-dlp-mark.severity-medium,
+.document-dlp-mark.severity-high {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: normal;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 @media (max-width: 520px) {
   .document-inspector-header {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    display: flex;
+    justify-content: space-between;
+    min-height: 48px;
     gap: 6px;
     padding-inline: 8px;
   }
@@ -2143,4 +2230,173 @@
   .document-inspector-title span {
     display: none;
   }
+}
+
+/* Targeted final UI fixes for compact actions and narrow inspector widths */
+.document-inspector-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.document-inspector-header,
+.document-inspector-title,
+.document-inspector-header-actions,
+.document-segmented-row,
+.document-header-tabs,
+.document-inspector-viewer,
+.document-zoom-shell,
+.document-text-page,
+.document-detected-layout,
+.document-original-code,
+.document-inspection-code,
+.document-secure-text {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.document-text-size-trigger {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.document-header-icon-action {
+  flex: 0 0 auto;
+}
+
+.document-header-icon-action img {
+  width: 14px;
+  height: 14px;
+}
+
+.document-text-size-popover {
+  position: absolute;
+  right: 0;
+  max-width: calc(100vw - 24px);
+}
+
+.document-text-size-popover button,
+.document-text-size-popover .document-text-size-value {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 9px;
+}
+
+.document-text-size-popover .document-text-size-value {
+  min-width: 48px;
+  border-right: 1px solid #E5E7EB;
+  border-left: 1px solid #E5E7EB;
+  background: transparent;
+  color: #111827;
+  cursor: default;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+.document-text-size-popover button + button {
+  border-left: 0;
+}
+
+.document-original-code,
+.document-inspection-code,
+.document-secure-text {
+  contain: inline-size;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.document-original-code .document-line,
+.document-inspection-code .document-line,
+.document-secure-text .document-line {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  display: flex !important;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0 clamp(8px, 2vw, 24px);
+  line-height: 1.6;
+}
+
+.document-line-number,
+.document-original-code .document-line-number,
+.document-inspection-code .document-line-number,
+.document-secure-text .document-line-number {
+  flex: 0 0 44px;
+  width: 44px;
+  max-width: 44px;
+  padding-right: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.document-original-code .document-line code,
+.document-inspection-code .document-line code,
+.document-secure-text .document-line code {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: inherit;
+}
+
+.document-original-code .document-line code {
+  overflow-wrap: anywhere;
+}
+
+.document-original-code .document-line code > span,
+.document-inspection-code .document-line code > span,
+.document-secure-text .document-line code > span {
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.document-dlp-mark,
+.document-dlp-mark.severity-low,
+.document-dlp-mark.severity-medium,
+.document-dlp-mark.severity-high {
+  display: inline;
+  max-width: 100%;
+  border: 1px solid #FDE68A;
+  border-radius: 4px;
+  background: rgba(254, 243, 199, 0.5);
+  color: #78350F;
+  font-weight: 600;
+  padding: 0 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.document-dlp-mark {
+  background: rgba(254, 243, 199, 0.5);
+  color: #78350F;
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }

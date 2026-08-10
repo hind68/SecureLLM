@@ -464,3 +464,78 @@
 .x-icon::after {
   transform: rotate(-45deg);
 }
+
+/* Targeted composer UI fixes */
+.composer {
+  max-width: calc(100% - 36px);
+  min-width: 0;
+}
+
+.composer-center {
+  position: static;
+  z-index: auto;
+  left: auto;
+  top: auto;
+  transform: none;
+  margin: 0 auto clamp(24px, 8vh, 72px);
+}
+
+.sidebar-closed .composer-center,
+.sidebar-open .composer-center {
+  left: auto;
+}
+
+.composer-attachments {
+  overflow: visible;
+}
+
+.attachment-chip {
+  width: min(220px, 100%);
+  max-width: 100%;
+  flex: 0 0 min(220px, 100%);
+}
+
+.attachment-chip-copy {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.attachment-name {
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.composer button.attachment-remove-button {
+  top: -5px;
+  right: -5px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+}
+
+.composer button.attachment-remove-button span,
+.composer button.attachment-remove-button .x-icon {
+  width: 8px;
+  height: 8px;
+}
+
+.composer button.attachment-remove-button span::before,
+.composer button.attachment-remove-button span::after,
+.composer button.attachment-remove-button .x-icon::before,
+.composer button.attachment-remove-button .x-icon::after {
+  top: 3px;
+  width: 8px;
+  height: 1.5px;
+}
+
+.composer-center {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+}

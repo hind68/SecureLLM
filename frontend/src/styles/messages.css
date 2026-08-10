@@ -424,25 +424,6 @@
   flex: 0 1 auto;
 }
 
-.dlp-inspect-button {
-  width: fit-content;
-  border: 1px solid #FCA5A5;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #991B1B;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 16px;
-  transition: 0.2s;
-}
-
-.dlp-inspect-button:hover {
-  border-color: #F87171;
-  background-color: #FEE2E2;
-}
-
 .dlp-detail-panel {
   margin-top: 12px;
   animation: assistant-error-in 180ms ease-out both;
@@ -717,23 +698,6 @@
     transform: translateY(-4px);
   }
 }
-.dlp-inspect-primary {
-  flex: 0 0 auto;
-  width: fit-content;
-  border: 1px solid #FCA5A5;
-  border-radius: 8px;
-  background: #FFFFFF;
-  color: #991B1B;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 650;
-  padding: 8px 14px;
-}
-
-.dlp-inspect-primary:hover {
-  background: #FEF2F2;
-}
-
 .message.assistant.dlp-blocked-response {
   width: min(var(--assistant-content-width), calc(100% - 36px));
   margin-right: auto;
@@ -788,4 +752,189 @@
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
+}
+
+/* Stable DLP blocked message sizing */
+.message.assistant.dlp-blocked-response {
+  width: min(var(--assistant-content-width), calc(100% - 36px));
+  max-width: min(var(--assistant-content-width), calc(100% - 36px));
+  min-width: 0;
+  margin-right: auto;
+  margin-left: auto;
+  justify-content: flex-start;
+}
+
+.message.assistant.dlp-blocked-response .bubble,
+.message.assistant.dlp-blocked-response .dlp-alert {
+  min-width: 0;
+}
+
+.message.assistant.dlp-blocked-response .bubble {
+  overflow: visible;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert {
+  overflow: hidden;
+}
+
+.dlp-alert-heading,
+.dlp-alert-title-row,
+.dlp-file-panel,
+.dlp-detail-panel,
+.dlp-alert-tabs,
+.dlp-code-view,
+.dlp-detections {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dlp-alert-heading > div,
+.dlp-alert-title-row > div {
+  min-width: 0;
+}
+
+.dlp-alert p,
+.dlp-alert strong,
+.dlp-detail-panel,
+.dlp-code-view,
+.dlp-code-view code,
+.dlp-sensitive-warning {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.dlp-code-view {
+  overflow-x: hidden;
+  white-space: pre-wrap;
+}
+
+.dlp-file-inspection-row {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.dlp-file-panel .message-attachments {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.dlp-file-panel .file-message-copy {
+  min-width: 0;
+}
+
+.dlp-file-panel .file-message-copy strong {
+  max-width: 100%;
+}
+
+.message.assistant.dlp-blocked-response .bubble {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert {
+  width: min(100%, 34rem);
+  max-width: min(100%, 34rem);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert.is-expanded {
+  width: 100%;
+  max-width: 100%;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert.is-compact {
+  width: min(100%, 34rem);
+  max-width: min(100%, 34rem);
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert strong {
+  font-size: 13px;
+  line-height: 1.32;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.message.assistant.dlp-blocked-response .dlp-alert-tabs button {
+  font-size: 12px;
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border-color: #FECACA;
+  background-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 2px rgba(127, 29, 29, 0.08);
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card.is-clickable {
+  cursor: pointer;
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card.is-clickable:hover {
+  border-color: #FCA5A5;
+  background-color: #FFFFFF;
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card.is-clickable:focus-visible {
+  border-color: #FCA5A5;
+  background-color: #FFFFFF;
+}
+
+/* Targeted file card width and DLP blocked-card polish */
+.message-attachments {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.file-message-card {
+  width: min(280px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-message-copy {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.file-message-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-color: #FECACA;
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.dlp-file-panel .file-message-card.dlp-file-card.is-clickable:hover {
+  border-color: #FCA5A5;
+  background-color: rgba(255, 255, 255, 0.82);
 }

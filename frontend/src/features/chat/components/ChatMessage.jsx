@@ -142,10 +142,12 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
   const [showOriginal, setShowOriginal] = useState(false)
   const matches = useMemo(() => message.dlpMatches || [], [message.dlpMatches])
   const attachments = Array.isArray(message.attachments) ? message.attachments : []
-  const hasDlpFiles = attachments.length > 0
+  const blockedAttachments = useMemo(() => attachments.filter((attachment) => hasDlpAttachmentSignal(attachment, matches, attachments.length)), [attachments, matches])
+  const hasDlpFiles = blockedAttachments.length > 0
   const safeText = message.dlpMaskedText || ''
   const originalText = message.dlpOriginalText || ''
   const hasOriginal = Boolean(originalText)
+  const hasOpenDetails = showSafe || showOriginal
   const summary = dlpUserMessage({
     code: 'DLP_BLOCKED',
     detectedTypes: message.dlpDetectedTypes,
@@ -161,7 +163,7 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
   )
 
   return (
-    <div className="dlp-alert" role="alert">
+    <div className={`dlp-alert ${hasOpenDetails ? 'is-expanded' : 'is-compact'}`} role="alert">
       <div className="dlp-alert-heading">
         <div className="dlp-alert-title-row">
           <SecurityIcon />
@@ -182,14 +184,12 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
       {hasDlpFiles ? (
         <section className="dlp-file-panel">
           <div className="dlp-file-inspection-row">
-            <AttachmentList attachments={attachments} onInspectDocument={onInspectDocument} variant="dlp-alert" />
-            <button
-              type="button"
-              className="dlp-inspect-primary"
-              onClick={() => inspectBlockedAttachment(attachments, matches, safeText, onInspectDocument)}
-            >
-              Inspecter
-            </button>
+            <AttachmentList
+              attachments={blockedAttachments}
+              onAttachmentAction={(attachment) => inspectBlockedAttachment(blockedAttachments, matches, safeText, onInspectDocument, attachment)}
+              onInspectDocument={onInspectDocument}
+              variant="dlp-alert"
+            />
           </div>
         </section>
       ) : (
@@ -241,8 +241,8 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
   )
 }
 
-function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDocument) {
-  const attachment = attachments.find((item) => item?.decision === 'BLOCK') || attachments[0]
+function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDocument, selectedAttachment) {
+  const attachment = selectedAttachment || attachments.find((item) => item?.decision === 'BLOCK') || attachments[0]
   if (!attachment) return
   const attachmentMatches = matches.filter((match) => (
     matchesAttachment(match, attachment)
@@ -253,6 +253,16 @@ function inspectBlockedAttachment(attachments, matches, maskedText, onInspectDoc
     maskedText: attachment.id ? '' : maskedText,
     matches: attachmentMatches,
     requestedView: 'detected',
+  })
+}
+
+function hasDlpAttachmentSignal(attachment, matches, attachmentCount = 1) {
+  const decision = String(attachment?.decision || attachment?.status || '').toUpperCase()
+  if (decision && !['ALLOW', 'ALLOWED', 'CLEAN', 'OK'].includes(decision)) return true
+  if (attachment?.flagged || attachment?.blocked || attachment?.hasDlpMatches || attachment?.dlpBlocked) return true
+  return (matches || []).some((match) => {
+    const hasScopedMatch = match?.attachmentId != null || match?.source
+    return (hasScopedMatch || attachmentCount === 1) && matchesAttachment(match, attachment)
   })
 }
 
@@ -283,7 +293,7 @@ function displayableMessageContent(message) {
   return content
 }
 
-function AttachmentList({ attachments, hideActions = false, hideViewButton = false, onInspectDocument, variant = 'message' }) {
+function AttachmentList({ attachments, hideActions = false, hideViewButton = false, onAttachmentAction, onInspectDocument, variant = 'message' }) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null
   return (
     <ul className="message-attachments">
@@ -294,7 +304,13 @@ function AttachmentList({ attachments, hideActions = false, hideViewButton = fal
           hideViewButton={hideViewButton}
           key={`${attachment.filename || attachment.name}-${index}`}
           variant={variant}
-          onAction={(selectedAttachment, mode) => onInspectDocument?.({ attachment: selectedAttachment, attachmentId: selectedAttachment.id, requestedView: normalizeAttachmentAction(mode) })}
+          onAction={(selectedAttachment, mode) => {
+            if (onAttachmentAction) {
+              onAttachmentAction(selectedAttachment, mode)
+              return
+            }
+            onInspectDocument?.({ attachment: selectedAttachment, attachmentId: selectedAttachment.id, requestedView: normalizeAttachmentAction(mode) })
+          }}
         />
       ))}
     </ul>

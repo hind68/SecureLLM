@@ -33,7 +33,8 @@ export default function FileAttachmentCard({ attachment, hideActions = false, hi
       onKeyDown={canOpen ? (event) => handleCardKeyDown(event, onAction, onInspect, attachment) : undefined}
       role={canOpen ? 'button' : undefined}
       tabIndex={canOpen ? 0 : undefined}
-      title={canOpen ? `Ouvrir ${filename}` : filename}
+      aria-label={canOpen ? filename : undefined}
+      title={filename}
     >
       {getFileIcon(filename, 32)}
       <span className="file-message-copy">

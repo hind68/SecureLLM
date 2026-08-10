@@ -265,7 +265,9 @@ describe('ChatMessage', () => {
     expect(html).toContain('Ligne 8')
     expect(html).toContain('Ligne 15')
     expect(html).toContain('document-threat-navigation shrink-0')
-    expect(html).toContain('document-threat-list max-h-32 overflow-y-auto shrink-0 is-collapsed')
+    expect(html).toContain('document-threat-list shrink-0 is-collapsed')
+    expect(html).not.toContain('max-h-32')
+    expect(html).not.toContain('document-threat-list max-h-32 overflow-y-auto')
     expect(html).toContain('Toutes')
     expect(html).toContain('\u00c9lev\u00e9es')
     expect(html).not.toContain('Voir les autres')
@@ -312,13 +314,15 @@ describe('ChatMessage', () => {
     )
 
     expect(html).toContain('22 menaces d\u00e9tect\u00e9es')
-    expect(html).toContain('18 \u00e9lev\u00e9es')
-    expect(html).toContain('4 moyennes')
+    expect(html).not.toContain('18 \u00e9lev\u00e9es')
+    expect(html).not.toContain('4 moyennes</strong>')
     expect(html).toContain('Toutes')
     expect(html).toContain('\u00c9lev\u00e9es')
     expect(html).toContain('Moyennes')
     expect(html).toContain('Voir les autres')
-    expect(html).toContain('document-threat-list max-h-32 overflow-y-auto shrink-0 is-collapsed')
+    expect(html).toContain('document-threat-list shrink-0 is-collapsed')
+    expect(html).not.toContain('max-h-32')
+    expect(html).not.toContain('document-threat-list max-h-32 overflow-y-auto')
     expect(html).toContain('document-inspection-code flex-1 min-h-0 overflow-y-auto')
     expect((html.match(/data-target-match-id=/g) || [])).toHaveLength(6)
     expect(html).toContain('document-header-tabs')
@@ -326,7 +330,7 @@ describe('ChatMessage', () => {
     expect(html).toContain('Aa')
     expect(html).not.toContain('A-')
     expect(html).not.toContain('A+')
-    expect(html).not.toContain('document-segmented-row')
+    expect(html).toContain('document-segmented-row')
   })
 
   it('shows unknown line instead of silently falling back to line one', () => {
@@ -419,17 +423,28 @@ describe('ChatMessage', () => {
     expect(cssRule(panelsCss, '.document-original-code')).toMatch(/scrollbar-width:\s*thin;/)
     expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/position:\s*absolute;/)
     expect(cssRule(panelsCss, '.document-secure-actionbar')).toMatch(/bottom:\s*0;/)
-    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/display:\s*none !important;/)
-    expect(cssRule(panelsCss, '.document-inspector-header')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto\s*auto;/)
-    expect(cssRule(panelsCss, '.document-header-tabs')).toMatch(/justify-self:\s*end;/)
+    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/display:\s*flex !important;/)
+    expect(cssRule(panelsCss, '.document-segmented-row')).toMatch(/justify-content:\s*center;/)
+    expect(cssRule(panelsCss, '.document-inspector-header')).toMatch(/display:\s*flex;/)
+    expect(cssRule(panelsCss, '.document-inspector-header')).toMatch(/justify-content:\s*space-between;/)
+    expect(cssRule(panelsCss, '.document-inspector-header')).toMatch(/min-height:\s*48px;/)
+    expect(cssRule(panelsCss, '.document-header-tabs')).toMatch(/margin:\s*0 auto;/)
+    expect(cssRule(panelsCss, '.document-text-size-trigger')).toMatch(/width:\s*24px;/)
+    expect(cssRule(panelsCss, '.document-text-size-trigger')).toMatch(/justify-content:\s*center;/)
+    expect(cssRule(panelsCss, '.document-text-size-trigger')).toMatch(/font-size:\s*12px;/)
     expect(cssRule(panelsCss, '.document-text-size-popover')).toMatch(/position:\s*absolute;/)
+    expect(cssRule(panelsCss, '.document-text-size-popover')).toMatch(/right:\s*0;/)
+    expect(cssRule(panelsCss, '.document-text-size-popover .document-text-size-value')).toMatch(/cursor:\s*default;/)
+    expect(cssRule(panelsCss, '.document-text-size-popover .document-text-size-value')).toMatch(/pointer-events:\s*none;/)
+    expect(inspectorSource).toContain('className="document-text-size-value"')
+    expect(inspectorSource).not.toContain('resetFontSize')
     expect(cssRule(panelsCss, '.document-inspector-header .document-close-button')).toMatch(/border-radius:\s*999px;/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/background:\s*rgba\(254,\s*243,\s*199,\s*0\.5\);/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/color:\s*#78350F;/)
     expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/font-weight:\s*600;/)
-    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/max-height:\s*8rem;/)
-    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/overflow-y:\s*auto;/)
-    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/overflow-x:\s*hidden;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).toMatch(/overflow:\s*visible;/)
+    expect(cssRule(panelsCss, '.document-threat-list')).not.toMatch(/max-height:/)
+    expect(cssRule(panelsCss, '.document-threat-list')).not.toMatch(/overflow-y:/)
     expect(cssRule(panelsCss, '.document-threat-list')).not.toMatch(/border-bottom:/)
     expect(cssRule(panelsCss, '.document-threat-list .document-threat-pill.is-active')).not.toMatch(/0F766E|118,\s*110/)
     expect(cssRule(panelsCss, '.document-dlp-mark.is-selected')).not.toMatch(/0F766E|118,\s*110/)
@@ -437,6 +452,8 @@ describe('ChatMessage', () => {
     expect(cssRule(panelsCss, '.document-inspection-code')).toMatch(/flex:\s*1 1 auto;/)
     expect(cssRule(panelsCss, '.document-inspection-code')).toMatch(/min-height:\s*0;/)
     expect(cssRule(panelsCss, '.document-line code')).not.toMatch(/word-break:\s*break-all;/)
+    expect(cssRule(panelsCss, '.document-original-code .document-line code')).toMatch(/overflow-wrap:\s*anywhere;/)
+    expect(cssRule(panelsCss, '.document-dlp-mark')).toMatch(/box-decoration-break:\s*clone;/)
     expect(inspectorSource).toContain('READER_FONT_SIZE = 13')
     expect(inspectorSource).not.toContain('document-zoom-controls')
     expect(inspectorSource).not.toContain('scale(')
@@ -446,7 +463,9 @@ describe('ChatMessage', () => {
     expect(inspectorSource).toContain('fetchAttachmentSecure')
     expect(inspectorSource).toContain('EXTRACTION_UNAVAILABLE')
     expect(inspectorSource).toContain('isTextLike(extension, contentType)')
-    expect(composerCss).toMatch(/\.composer-center\s*\{[^}]*position:\s*absolute;[^}]*left:\s*50%;/s)
+    expect(cssRule(composerCss, '.composer-center')).toMatch(/position:\s*static;/)
+    expect(cssRule(composerCss, '.attachment-chip')).toMatch(/width:\s*min\(220px,\s*100%\);/)
+    expect(cssRule(composerCss, '.attachment-name')).toMatch(/text-overflow:\s*ellipsis;/)
     expect(composerCss).not.toContain('100vw')
   })
 
@@ -456,9 +475,13 @@ describe('ChatMessage', () => {
     const markdownCss = readFileSync(new URL('../../../styles/markdown.css', import.meta.url), 'utf8')
 
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/width:\s*min\(var\(--assistant-content-width\),\s*calc\(100% - 36px\)\);/)
-    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/width:\s*fit-content;/)
-    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/max-width:\s*min\(75%,\s*48rem\);/)
-    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/width:\s*fit-content;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/width:\s*100%;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .bubble')).toMatch(/max-width:\s*100%;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/width:\s*min\(100%,\s*34rem\);/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/max-width:\s*min\(100%,\s*34rem\);/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert')).toMatch(/overflow:\s*hidden;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert.is-expanded')).toMatch(/width:\s*100%;/)
+    expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response .dlp-alert.is-expanded')).toMatch(/max-width:\s*100%;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).toMatch(/margin-left:\s*auto;/)
     expect(cssRule(messagesCss, '.message.assistant.dlp-blocked-response')).not.toMatch(/width:\s*100%;/)
     expect(cssRule(chatCss, '.messages')).toMatch(/padding-bottom:\s*136px;/)
@@ -517,7 +540,7 @@ describe('ChatMessage', () => {
     expect(html).not.toContain('conversion PDF')
   })
 
-  it('renders one inspect button for blocked file messages', () => {
+  it('opens blocked file messages from the clickable attachment card', () => {
     const messagesCss = readFileSync(new URL('../../../styles/messages.css', import.meta.url), 'utf8')
     const html = renderToStaticMarkup(
       <ChatMessage
@@ -540,8 +563,7 @@ describe('ChatMessage', () => {
       />,
     )
 
-    expect(html).toContain('Inspecter')
-    expect((html.match(/Inspecter/g) || [])).toHaveLength(1)
+    expect(html).not.toContain('Inspecter')
     expect(html).not.toContain('Pieces jointes: secret.txt')
     expect(html).not.toContain('Pièces jointes: secret.txt')
     expect(html).not.toContain('Voir secret.txt')
@@ -551,7 +573,44 @@ describe('ChatMessage', () => {
     expect(cssRule(messagesCss, '.file-message-card.is-clickable')).toMatch(/cursor:\s*pointer;/)
     expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card')).toMatch(/border-color:\s*#FECACA;/)
     expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card')).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.6\)/)
+    expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card')).toMatch(/overflow:\s*hidden;/)
+    expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card.is-clickable')).toMatch(/cursor:\s*pointer;/)
+    expect(cssRule(messagesCss, '.dlp-file-panel .file-message-card.dlp-file-card.is-clickable:hover')).toMatch(/border-color:\s*#FCA5A5;/)
+    expect(messagesCss).not.toContain('content: "Ouvrir"')
+    expect(messagesCss).not.toContain('dlp-inspect-primary')
+    expect(messagesCss).not.toContain('dlp-inspect-button')
     expect(html).not.toContain('OPENAI_API_KEY_1</span><span class="dlp-detection-type"')
+  })
+
+  it('shows only DLP-signaled attachments inside blocked file alerts', () => {
+    const html = renderToStaticMarkup(
+      <ChatMessage
+        copiedKey=""
+        fallbackModelName="GPT"
+        message={{
+          id: 45,
+          role: 'USER',
+          status: 'DLP_BLOCKED',
+          content: 'Pieces jointes: clean.pdf, secret.txt',
+          dlpMaskedText: 'Token [OPENAI_API_KEY_1]',
+          dlpHighestSeverity: 'HIGH',
+          dlpDetectedTypes: ['openai_api_key'],
+          dlpMatches: [{ id: 'openai_api_key_1', attachmentId: 11, type: 'openai_api_key', start: 6, end: 20, lineNumber: 1, placeholder: '[OPENAI_API_KEY_1]' }],
+          attachments: [
+            { id: 10, filename: 'clean.pdf', size: 512, decision: 'ALLOW' },
+            { id: 11, filename: 'secret.txt', size: 512, decision: 'BLOCK' },
+          ],
+        }}
+        onCopy={vi.fn()}
+        onInspectDocument={vi.fn()}
+        setCopiedKey={vi.fn()}
+      />,
+    )
+
+    const blockedPanelHtml = html.slice(html.indexOf('dlp-file-panel'))
+    expect(html).toContain('clean.pdf')
+    expect(blockedPanelHtml).toContain('secret.txt')
+    expect(blockedPanelHtml).not.toContain('clean.pdf</strong>')
   })
 })
 

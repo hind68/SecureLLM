@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import mammoth from 'mammoth'
 import {
   downloadSecureAttachment,
@@ -32,6 +32,7 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
   const [copySucceeded, setCopySucceeded] = useState(false)
   const [fontSize, setFontSize] = useState(READER_FONT_SIZE)
   const [showTextSizeMenu, setShowTextSizeMenu] = useState(false)
+  const textSizeControlRef = useRef(null)
 
   useEffect(() => {
     setActiveTab(initialMode(target))
@@ -85,6 +86,26 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
       if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
   }, [attachmentKey])
+
+  useEffect(() => {
+    if (!showTextSizeMenu) return undefined
+
+    function closeOnOutsideInteraction(event) {
+      if (textSizeControlRef.current?.contains(event.target)) return
+      setShowTextSizeMenu(false)
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setShowTextSizeMenu(false)
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideInteraction)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideInteraction)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [showTextSizeMenu])
 
   useEffect(() => {
     if (!attachment) return undefined
@@ -222,19 +243,8 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
           <strong title={filename}>{filename}</strong>
           <span>{extension}</span>
         </div>
-        <div className="segmented-control document-header-tabs" role="tablist" aria-label="Vues du document">
-          <button type="button" role="tab" aria-selected={activeTab === 'original'} className={activeTab === 'original' ? 'active' : ''} onClick={() => setActiveTab('original')}>
-            Original
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'detected'} className={activeTab === 'detected' ? 'active' : ''} onClick={() => setActiveTab('detected')}>
-            Menaces ({matchCount})
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'secure'} className={activeTab === 'secure' ? 'active' : ''} onClick={() => setActiveTab('secure')}>
-            Sécurisé
-          </button>
-        </div>
         <div className="document-inspector-header-actions">
-          <div className="document-text-size-control">
+          <div className="document-text-size-control" ref={textSizeControlRef}>
             <button
               type="button"
               className="document-header-icon-action document-text-size-trigger"
@@ -248,14 +258,14 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
             {showTextSizeMenu && (
               <div className="document-text-size-popover" role="dialog" aria-label="Taille du texte">
                 <button type="button" aria-label="Réduire la taille du texte" onClick={decreaseFontSize}>A-</button>
-                <span>{fontSize} px</span>
+                <span className="document-text-size-value" aria-label="Taille actuelle du texte">{fontSize} px</span>
                 <button type="button" aria-label="Agrandir la taille du texte" onClick={increaseFontSize}>A+</button>
               </div>
             )}
           </div>
           {canDownloadOriginal && (
             <a className="document-header-icon-action" href={`/api/attachments/${attachment.id}/content`} download aria-label="Télécharger le fichier original" title="Télécharger le fichier original">
-              <img src="/assets/download.png" alt="" aria-hidden="true" />
+              <img src="/assets/downloads.png" alt="" aria-hidden="true" />
             </a>
           )}
           <button type="button" className="document-close-button" aria-label="Fermer l'inspection du document" title="Fermer" onClick={onClose}>
@@ -263,6 +273,20 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
           </button>
         </div>
       </header>
+
+      <div className="document-segmented-row">
+        <div className="segmented-control document-header-tabs" role="tablist" aria-label="Vues du document">
+          <button type="button" role="tab" aria-selected={activeTab === 'original'} className={activeTab === 'original' ? 'active' : ''} onClick={() => setActiveTab('original')}>
+            Original
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'detected'} className={activeTab === 'detected' ? 'active' : ''} onClick={() => setActiveTab('detected')}>
+            Menaces ({matchCount})
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'secure'} className={activeTab === 'secure' ? 'active' : ''} onClick={() => setActiveTab('secure')}>
+            Sécurisé
+          </button>
+        </div>
+      </div>
 
       <div className="document-inspector-viewer">
         <div className="document-zoom-shell">
@@ -281,7 +305,7 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
             <span>Copier</span>
           </button>
           <button type="button" className="document-icon-action labeled" title={hasSecureText ? 'Télécharger la version sécurisée' : 'Version sécurisée indisponible'} aria-label="Télécharger la version sécurisée" disabled={!hasSecureText} onClick={handleDownloadSecure}>
-            <img src="/assets/download.png" alt="" aria-hidden="true" />
+            <img src="/assets/downloads.png" alt="" aria-hidden="true" />
             <span>Télécharger</span>
           </button>
           <button type="button" className="document-icon-action primary labeled" title={hasSecureText ? 'Ajouter la version sécurisée aux pièces jointes' : 'Version sécurisée indisponible'} aria-label="Ajouter la version sécurisée aux pièces jointes" disabled={!hasSecureText} onClick={handleAttachSecureVersion}>
@@ -456,7 +480,7 @@ function DetectionIndex({ matches, selectedMatchId, text, onSelect }) {
           ))}
         </div>
       </div>
-      <div className={`document-threat-list max-h-32 overflow-y-auto shrink-0 ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
+      <div className={`document-threat-list shrink-0 ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
         {visibleChips.map((match, index) => {
           const id = matchKey(match)
           const severity = severityClass(match)
@@ -650,11 +674,7 @@ function threatFilters(counts) {
 }
 
 function threatSummary(counts) {
-  const parts = [`${counts.total} ${counts.total > 1 ? 'menaces détectées' : 'menace détectée'}`]
-  if (counts.high > 0) parts.push(`${counts.high} ${counts.high > 1 ? 'élevées' : 'élevée'}`)
-  if (counts.medium > 0) parts.push(`${counts.medium} ${counts.medium > 1 ? 'moyennes' : 'moyenne'}`)
-  if (counts.low > 0) parts.push(`${counts.low} ${counts.low > 1 ? 'faibles' : 'faible'}`)
-  return parts.join(' · ')
+  return `${counts.total} ${counts.total > 1 ? 'menaces détectées' : 'menace détectée'}`
 }
 
 function severityGroup(match) {

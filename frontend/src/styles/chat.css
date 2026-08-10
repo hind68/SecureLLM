@@ -72,7 +72,7 @@
 .welcome-mode .messages {
   display: grid;
   place-items: center;
-  padding-bottom: 0;
+  padding: 16px 24px clamp(24px, 6vh, 72px);
 }
 
 .conversation-mode .messages {
@@ -105,8 +105,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 26px;
-  transform: translateY(32px);
+  gap: clamp(18px, 4vh, 34px);
+  transform: none;
 }
 
 .welcome-stack .composer {
