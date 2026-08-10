@@ -57,10 +57,6 @@
     left: -4px;
   }
 
-  .composer-center,
-  .sidebar-closed .composer-center {
-    left: 50%;
-  }
 }
 
 

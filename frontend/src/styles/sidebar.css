@@ -470,13 +470,4 @@
   margin-left: var(--sidebar-open-width);
 }
 
-.sidebar-closed .composer-center {
-  left: calc(var(--sidebar-closed-width) + (100vw - var(--sidebar-closed-width)) / 2);
-}
-
-.sidebar-open .composer-center,
-.composer-center {
-  left: calc(var(--sidebar-open-width) + (100vw - var(--sidebar-open-width)) / 2);
-}
-
 

@@ -17,6 +17,7 @@ export default function ChatThread({
   onInspectDocument,
   onMessagesScroll,
   setCopiedKey,
+  welcomeComposer,
 }) {
   return (
     <>
@@ -31,6 +32,7 @@ export default function ChatThread({
             <div className="empty-state">
               <h2>Comment puis-je vous aider ?</h2>
             </div>
+            {!hasActiveMessages && welcomeComposer}
           </div>
         )}
 

@@ -263,26 +263,48 @@ export default function AppLayout({
           onInspectDocument={openInspector}
           onMessagesScroll={chat.onMessagesScroll}
           setCopiedKey={chat.setCopiedKey}
+          welcomeComposer={!chat.hasActiveMessages ? (
+            <ChatComposer
+              attachments={chat.attachments}
+              canSend={chat.canSend}
+              composerRef={chat.composerRef}
+              draft={chat.draft}
+              hasActiveMessages={chat.hasActiveMessages}
+              isComposerMaxed={chat.isComposerMaxed}
+              isGenerating={status.isGenerating}
+              onDraftChange={chat.setDraft}
+              onFilesSelected={chat.addAttachments}
+              onInspectDocument={openInspector}
+              onKeyDown={chat.handleKeyDown}
+              onRemoveFile={chat.removeAttachment}
+              onRemoveFiles={chat.clearAttachments}
+              onStop={chat.stopGeneration}
+              onSubmit={actions.sendMessage}
+              textareaRef={chat.textareaRef}
+            />
+          ) : null}
         />
 
-        <ChatComposer
-          attachments={chat.attachments}
-          canSend={chat.canSend}
-          composerRef={chat.composerRef}
-          draft={chat.draft}
-          hasActiveMessages={chat.hasActiveMessages}
-          isComposerMaxed={chat.isComposerMaxed}
-          isGenerating={status.isGenerating}
-          onDraftChange={chat.setDraft}
-          onFilesSelected={chat.addAttachments}
-          onInspectDocument={openInspector}
-          onKeyDown={chat.handleKeyDown}
-          onRemoveFile={chat.removeAttachment}
-          onRemoveFiles={chat.clearAttachments}
-          onStop={chat.stopGeneration}
-          onSubmit={actions.sendMessage}
-          textareaRef={chat.textareaRef}
-        />
+        {chat.hasActiveMessages && (
+          <ChatComposer
+            attachments={chat.attachments}
+            canSend={chat.canSend}
+            composerRef={chat.composerRef}
+            draft={chat.draft}
+            hasActiveMessages={chat.hasActiveMessages}
+            isComposerMaxed={chat.isComposerMaxed}
+            isGenerating={status.isGenerating}
+            onDraftChange={chat.setDraft}
+            onFilesSelected={chat.addAttachments}
+            onInspectDocument={openInspector}
+            onKeyDown={chat.handleKeyDown}
+            onRemoveFile={chat.removeAttachment}
+            onRemoveFiles={chat.clearAttachments}
+            onStop={chat.stopGeneration}
+            onSubmit={actions.sendMessage}
+            textareaRef={chat.textareaRef}
+          />
+        )}
 
         <Toast
           chatError={feedback.chatError}
