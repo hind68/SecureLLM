@@ -194,6 +194,7 @@ export default function AppLayout({
       <div className="chat-workspace">
       <main
         className={`chat-main ${chat.hasActiveMessages ? 'conversation-mode' : 'welcome-mode'} ${isDraggingFiles ? 'is-dragging-files' : ''}`}
+        style={chat.goBottomTop == null ? undefined : { '--go-bottom-top': `${chat.goBottomTop}px` }}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
