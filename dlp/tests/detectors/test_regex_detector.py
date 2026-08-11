@@ -232,6 +232,26 @@ def test_detects_env_style_secret():
     matches = [m for m in run_regex_detectors(text) if m["type"] == "hardcoded_secret"]
     assert any(m["value"] == "hunter2345" for m in matches)
 
+def test_detects_real_env_style_secret_next_to_placeholder_cases():
+    text = "DB_PASSWORD=realSecret123"
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "hardcoded_secret"]
+    assert any(m["value"] == "realSecret123" for m in matches)
+
+def test_env_style_secret_ignores_synapse_hardcoded_secret_placeholder():
+    text = "DB_PASSWORD=[HARDCODED_SECRET_1]"
+    matches = [m for m in run_regex_detectors(text) if m["type"] == "hardcoded_secret"]
+    assert matches == []
+
+def test_env_style_secret_ignores_synapse_github_token_placeholder():
+    text = "GITHUB_TOKEN=[GITHUB_TOKEN_1]"
+    matches = run_regex_detectors(text)
+    assert not any(m["type"] in {"hardcoded_secret", "github_token"} for m in matches)
+
+def test_env_style_secret_ignores_prefixed_openai_placeholder():
+    text = "OPENAI_API_KEY=sk-proj-[API_KEY_1]"
+    matches = run_regex_detectors(text)
+    assert not any(m["type"] in {"hardcoded_secret", "openai_api_key"} for m in matches)
+
 def test_env_style_secret_ignores_unrelated_assignment():
     text = "DEBUG=true"
     matches = [m for m in run_regex_detectors(text) if m["type"] == "hardcoded_secret"]

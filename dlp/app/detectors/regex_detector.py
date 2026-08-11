@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.detectors.luhn import is_luhn_valid
 from app.detectors.iban import is_iban_valid
+from app.pipeline.masking import is_neutralized_placeholder_value
 
 # Patterns live in patterns.json rather than as hardcoded constants here,
 # so adding a new one is a data change, not a code change - see
@@ -131,6 +132,8 @@ def _run_rules(rules: list[dict], text: str) -> list[dict]:
                 value = match.group()
                 start, end = match.start(), match.end()
 
+            if is_neutralized_placeholder_value(value):
+                continue
             if rule["validator"] and not rule["validator"](value):
                 continue
             matches.append({

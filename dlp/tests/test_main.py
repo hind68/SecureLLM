@@ -252,6 +252,44 @@ def test_openai_project_key_is_fully_masked_without_prefix_leak(monkeypatch):
     assert any(match["type"] == "openai_api_key" for match in data["matches"])
 
 
+def test_masked_secret_placeholders_are_idempotent(monkeypatch):
+    _disable_presidio(monkeypatch)
+    text = "\n".join([
+        "DB_PASSWORD=realSecret123",
+        "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz123456",
+        "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz1234567890",
+    ])
+
+    first = client.post("/analyse", json={"text": text}).json()
+    second = client.post("/analyse", json={"text": first["masked_text"]}).json()
+
+    assert first["decision"] == "BLOCK"
+    assert "DB_PASSWORD=[HARDCODED_SECRET_1]" in first["masked_text"]
+    assert "GITHUB_TOKEN=[GITHUB_TOKEN_1]" in first["masked_text"]
+    assert "OPENAI_API_KEY=[API_KEY_1]" in first["masked_text"]
+    assert second["decision"] == "ALLOW"
+    assert second["matches"] == []
+    assert second["masked_text"] == first["masked_text"]
+
+
+def test_presidio_placeholder_matches_are_filtered(monkeypatch):
+    text = "Contact [EMAIL_1]"
+    monkeypatch.setattr(main, "detect_with_presidio", lambda value, language="en": [{
+        "type": "email",
+        "start": value.index("[EMAIL_1]"),
+        "end": value.index("[EMAIL_1]") + len("[EMAIL_1]"),
+        "score": 0.9,
+        "severity": "medium",
+        "source": "presidio",
+    }])
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == "ALLOW"
+    assert data["matches"] == []
+    assert data["masked_text"] == text
+
+
 def test_two_openai_keys_get_coherent_indices(monkeypatch):
     _disable_presidio(monkeypatch)
     text = (

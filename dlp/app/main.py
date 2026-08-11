@@ -15,7 +15,7 @@ from app.detectors.regex_detector import run_regex_detectors
 from app.detectors.presidio_detector import detect_with_presidio, warm_up_models
 from app.pipeline.dedup import deduplicate_matches
 from app.pipeline.ids import assign_ids
-from app.pipeline.masking import mask_text
+from app.pipeline.masking import is_neutralized_placeholder_value, mask_text
 from app.pipeline.alerting import check_and_log_alerts
 from app.pipeline.decision import evaluate_decision, highest_severity, strip_sensitive_values
 from app.config import DLP_MAX_ATTACHMENTS, DLP_MAX_TEXT_LENGTH, MAX_UPLOAD_BYTES
@@ -117,6 +117,18 @@ def _success_response(text: str, matches: list[dict], user_id: str | None = None
     }
 
 
+def _drop_neutralized_placeholder_matches(text: str, matches: list[dict]) -> list[dict]:
+    kept = []
+    for match in matches:
+        value = match.get("value")
+        if value is None:
+            value = text[match["start"]:match["end"]]
+        if is_neutralized_placeholder_value(value):
+            continue
+        kept.append(match)
+    return kept
+
+
 def run_pipeline(text: str, user_id: str | None = None, filename: str | None = None) -> dict:
     """
     The single shared detect -> dedup -> id -> alert -> mask pipeline.
@@ -130,7 +142,10 @@ def run_pipeline(text: str, user_id: str | None = None, filename: str | None = N
     lang = detect_language(text)
 
     # Run Regex + our multilingual NER engine
-    combined = run_regex_detectors(text) + detect_with_presidio(text, language=lang)
+    combined = _drop_neutralized_placeholder_matches(
+        text,
+        run_regex_detectors(text) + detect_with_presidio(text, language=lang),
+    )
 
     deduped = deduplicate_matches(combined)
     final_matches = assign_ids(deduped)
@@ -165,10 +180,13 @@ def run_pipeline_for_segments(known_text: str, free_text: str, user_id: str | No
             detail=f"Text exceeds maximum length of {DLP_MAX_TEXT_LENGTH} characters.",
         )
 
-    known_matches = run_regex_detectors(known_text)
+    known_matches = _drop_neutralized_placeholder_matches(known_text, run_regex_detectors(known_text))
 
     lang = detect_language(free_text)
-    free_matches = run_regex_detectors(free_text) + detect_with_presidio(free_text, language=lang)
+    free_matches = _drop_neutralized_placeholder_matches(
+        free_text,
+        run_regex_detectors(free_text) + detect_with_presidio(free_text, language=lang),
+    )
     offset = len(known_text) + 1  # +1 for the "\n" joiner above
     for m in free_matches:
         m["start"] += offset

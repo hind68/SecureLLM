@@ -1,4 +1,9 @@
-from app.pipeline.masking import mask_text, build_placeholder
+from app.pipeline.masking import (
+    build_placeholder,
+    is_neutralized_placeholder_value,
+    is_synapse_placeholder,
+    mask_text,
+)
 
 
 def test_build_placeholder_uses_id():
@@ -42,3 +47,13 @@ def test_masking_replaces_from_end_without_extra_brackets():
 
     assert masked == "A [LOCATION_1] B [API_KEY_1]"
     assert "]]" not in masked
+
+
+def test_synapse_placeholders_are_recognized_as_neutralized_values():
+    assert is_synapse_placeholder("[EMAIL_1]")
+    assert is_synapse_placeholder("[HARDCODED_SECRET_1]")
+    assert is_neutralized_placeholder_value("[HARDCODED_SECRET_1]")
+    assert is_neutralized_placeholder_value("sk-proj-[API_KEY_1]")
+    assert is_neutralized_placeholder_value("ghp_[GITHUB_TOKEN_1]")
+    assert not is_neutralized_placeholder_value("realSecret123")
+    assert not is_neutralized_placeholder_value("realSecret123[HARDCODED_SECRET_1]")
