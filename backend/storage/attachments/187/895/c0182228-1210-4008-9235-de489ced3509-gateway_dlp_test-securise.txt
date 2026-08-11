@@ -1,1 +1,0 @@
-Pieces jointes: gateway_dlp_test.txt
