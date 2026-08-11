@@ -200,6 +200,29 @@ def test_confirmed_false_positive_phrases_are_allowed():
         assert data["matches"] == []
 
 
+@pytest.mark.parametrize("text", [
+    "Voici l'image Markdown ![Image](/assets/check.png)",
+    "Voici l'image Markdown ![Image](https://example.com/assets/check.png)",
+])
+def test_public_markdown_image_urls_are_not_masked(text):
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == "ALLOW"
+    assert data["matches"] == []
+    assert data["masked_text"] == text
+
+
+def test_sensitive_secret_in_url_is_still_detected(monkeypatch):
+    _disable_presidio(monkeypatch)
+    text = "Webhook https://example.com/callback?token=sk-abcdefghijklmnopqrstuvwxyz123456"
+
+    data = client.post("/analyse", json={"text": text}).json()
+
+    assert data["decision"] == "BLOCK"
+    assert any(match["type"] == "openai_api_key" for match in data["matches"])
+    assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in data["masked_text"]
+
+
 def test_labeled_compact_rib_blocks_without_exposing_value(monkeypatch):
     _disable_presidio(monkeypatch)
     data = client.post("/analyse", json={"text": "Mon RIB est 007780000045678901234567."}).json()

@@ -94,6 +94,26 @@ class ChatServiceTest {
 
     @ParameterizedTest
     @CsvSource({
+            "'Voici ![Image](/assets/check.png)'",
+            "'Voici ![Image](https://example.com/assets/check.png)'"
+    })
+    void chatSendsPublicMarkdownImageUrlsUnchangedToLiteLlm(String prompt) {
+        ChatRequest request = new ChatRequest("secure-gemini", prompt);
+        when(modeleLlmRepository.existsByAliasInterneAndStatut("secure-gemini", StatutModeleLlm.ACTIF))
+                .thenReturn(true);
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(demoUser.getExternalId()).thenReturn("demo-user");
+        when(dlpService.safeTextForLlm(prompt, "demo-user")).thenReturn(prompt);
+        when(liteLlmService.chat("secure-gemini", prompt)).thenReturn("OK");
+
+        chatService.chat(request);
+
+        verify(dlpService).safeTextForLlm(prompt, "demo-user");
+        verify(liteLlmService).chat("secure-gemini", prompt);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "Mon email est client@example.com,Mon email est [EMAIL],client@example.com",
             "Mon telephone est 0612345678,Mon telephone est [PHONE],0612345678",
             "Token ghp_abcdefghijklmnopqrstuvwxyz123456,Token [TOKEN],ghp_abcdefghijklmnopqrstuvwxyz123456"

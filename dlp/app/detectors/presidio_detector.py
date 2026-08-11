@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from urllib.parse import parse_qsl, urlparse
 
 from app.detectors.presidio_config import SUPPORTED_NLP_LANGUAGES, get_analyzer, warm_up_analyzer
 from app.policy import severity_for
@@ -95,6 +96,33 @@ _TECHNICAL_CONTEXT_PATTERNS = (
     re.compile(r"[{};=]"),
 )
 
+_SENSITIVE_URL_PARAM_NAMES = {
+    "access_token",
+    "api_key",
+    "apikey",
+    "auth",
+    "authorization",
+    "bearer",
+    "client_secret",
+    "code",
+    "key",
+    "pass",
+    "passwd",
+    "password",
+    "pwd",
+    "secret",
+    "signature",
+    "sig",
+    "token",
+}
+
+_SENSITIVE_URL_VALUE_PATTERNS = (
+    re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,71}\b"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_.=-]{8,}\b"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{24,}\b"),
+)
+
 
 def warm_up_models() -> None:
     warm_up_analyzer()
@@ -110,6 +138,13 @@ def detect_with_presidio(text: str, language: str = "en") -> list[dict]:
         if result.entity_type == "PERSON":
             continue
         detected_text = text[result.start:result.end]
+        if result.entity_type == "URL":
+            markdown_destination = _markdown_image_destination_at(text, result.start, result.end)
+            if (
+                _is_public_non_sensitive_url(detected_text)
+                or (markdown_destination and _is_public_non_sensitive_url(markdown_destination))
+            ):
+                continue
         if _is_generic_nlp_false_positive(result.entity_type, detected_text, text):
             continue
 
@@ -145,6 +180,60 @@ def _is_generic_nlp_false_positive(entity_type: str, detected_text: str, full_te
     if detected_text.strip() == normalized_lower:
         return True
     return normalized_lower in _NLP_SINGLE_TOKEN_FALSE_POSITIVES
+
+
+def _is_public_non_sensitive_url(value: str) -> bool:
+    candidate = (value or "").strip().strip(".,;:!?)]}")
+    if not candidate:
+        return False
+
+    if candidate.startswith("/"):
+        return not _contains_sensitive_url_material(candidate)
+
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    if parsed.username or parsed.password:
+        return False
+    return not _contains_sensitive_url_material(candidate)
+
+
+def _contains_sensitive_url_material(value: str) -> bool:
+    parsed = urlparse(value)
+    if any(pattern.search(value) for pattern in _SENSITIVE_URL_VALUE_PATTERNS):
+        return True
+
+    query = parsed.query
+    if not query and value.startswith("/") and "?" in value:
+        query = value.split("?", 1)[1]
+
+    for name, param_value in parse_qsl(query, keep_blank_values=True):
+        normalized_name = _normalize_nlp_text(name).replace(" ", "_")
+        if normalized_name in _SENSITIVE_URL_PARAM_NAMES:
+            return True
+        if any(pattern.search(param_value) for pattern in _SENSITIVE_URL_VALUE_PATTERNS):
+            return True
+    return False
+
+
+def _markdown_image_destination_at(text: str, start: int, end: int) -> str | None:
+    open_paren = text.rfind("](", 0, start + 1)
+    if open_paren < 0:
+        return None
+    image_marker = text.rfind("![", 0, open_paren)
+    if image_marker < 0:
+        return None
+    if text.find(")", image_marker, open_paren) != -1:
+        return None
+
+    close_paren = text.find(")", end)
+    if close_paren < 0:
+        return None
+
+    destination_start = open_paren + 2
+    if not (destination_start <= start and end <= close_paren):
+        return None
+    return text[destination_start:close_paren].strip()
 
 
 def _normalize_nlp_text(value: str) -> str:
