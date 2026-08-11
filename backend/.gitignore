@@ -29,5 +29,8 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+# Runtime uploaded attachments
+backend/storage/attachments/
+
 ### VS Code ###
 .vscode/

@@ -79,8 +79,13 @@ export function MarkdownImage({ src = '', alt = '', title }) {
 }
 
 export function isRenderableMarkdownImageUrl(src) {
+  const value = String(src || '').trim()
+  if (!value) return false
+
+  if (value.startsWith('/')) return true
+
   try {
-    const url = new URL(String(src || ''))
+    const url = new URL(value)
     return url.protocol === 'http:' || url.protocol === 'https:'
   } catch {
     return false
