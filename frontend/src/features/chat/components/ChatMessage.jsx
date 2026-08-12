@@ -8,6 +8,8 @@ import { dlpUserMessage } from '../utils/dlpErrors'
 import { splitMaskedTextByPlaceholders, normalizeSensitiveSpans, splitTextBySpans } from '../utils/dlpViews'
 import { detectTextDirection } from '../utils/markdown'
 
+const COLLAPSED_ATTACHMENT_COUNT = 3
+
 function ChatMessage({ copiedKey, fallbackModelAlias, fallbackModelName, message, onCopy, onInspectDocument, setCopiedKey }) {
   const isUser = message.role === 'USER'
   const isDlpBlocked = message.status === 'DLP_BLOCKED'
@@ -140,10 +142,16 @@ function ChatMessage({ copiedKey, fallbackModelAlias, fallbackModelName, message
 function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySafe, onInspectDocument }) {
   const [showSafe, setShowSafe] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [showAllAttachments, setShowAllAttachments] = useState(false)
   const matches = useMemo(() => message.dlpMatches || [], [message.dlpMatches])
   const attachments = Array.isArray(message.attachments) ? message.attachments : []
   const blockedAttachments = useMemo(() => attachments.filter((attachment) => hasDlpAttachmentSignal(attachment, matches, attachments.length)), [attachments, matches])
   const hasDlpFiles = blockedAttachments.length > 0
+  const hiddenAttachmentCount = Math.max(blockedAttachments.length - COLLAPSED_ATTACHMENT_COUNT, 0)
+  const canToggleAttachments = hiddenAttachmentCount > 0
+  const visibleBlockedAttachments = showAllAttachments
+    ? blockedAttachments
+    : blockedAttachments.slice(0, COLLAPSED_ATTACHMENT_COUNT)
   const safeText = message.dlpMaskedText || ''
   const originalText = message.dlpOriginalText || ''
   const hasOriginal = Boolean(originalText)
@@ -185,12 +193,28 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
         <section className="dlp-file-panel">
           <div className="dlp-file-inspection-row">
             <AttachmentList
-              attachments={blockedAttachments}
+              attachments={visibleBlockedAttachments}
               onAttachmentAction={(attachment) => inspectBlockedAttachment(blockedAttachments, matches, safeText, onInspectDocument, attachment)}
               onInspectDocument={onInspectDocument}
               variant="dlp-alert"
             />
           </div>
+          {canToggleAttachments && (
+            <button
+              type="button"
+              className="dlp-attachments-toggle"
+              aria-expanded={showAllAttachments}
+              onClick={() => setShowAllAttachments((current) => !current)}
+            >
+              <span>{showAllAttachments ? 'R\u00e9duire' : `Afficher ${hiddenAttachmentCount} autre${hiddenAttachmentCount > 1 ? 's' : ''}`}</span>
+              <img
+                src="/assets/down.png"
+                alt=""
+                aria-hidden="true"
+                className={`dlp-attachments-toggle-icon ${showAllAttachments ? 'is-expanded' : ''}`}
+              />
+            </button>
+          )}
         </section>
       ) : (
         <div className="dlp-alert-tabs">

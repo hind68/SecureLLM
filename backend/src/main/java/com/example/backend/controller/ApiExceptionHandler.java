@@ -3,12 +3,15 @@ package com.example.backend.controller;
 import com.example.backend.integration.dlp.DlpBlockedException;
 import com.example.backend.integration.dlp.DlpPublicMatch;
 import com.example.backend.integration.dlp.DlpUnavailableException;
+import com.example.backend.service.AttachmentLimitExceededException;
 import java.util.List;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -22,7 +25,9 @@ public class ApiExceptionHandler {
                 exception.getDetectedTypes(),
                 exception.getHighestSeverity(),
                 exception.getMaskedText(),
-                exception.getMatches()
+                exception.getMatches(),
+                null,
+                null
         );
     }
 
@@ -35,7 +40,41 @@ public class ApiExceptionHandler {
                 Set.of(),
                 null,
                 null,
-                List.of()
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException exception) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        return ResponseEntity
+                .status(status == null ? HttpStatus.BAD_REQUEST : status)
+                .body(new ApiError(
+                        "REQUEST_INVALID",
+                        exception.getReason(),
+                        Set.of(),
+                        null,
+                        null,
+                        List.of(),
+                        null,
+                        null
+                ));
+    }
+
+    @ExceptionHandler(AttachmentLimitExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleAttachmentLimitExceeded(AttachmentLimitExceededException exception) {
+        return new ApiError(
+                "ATTACHMENT_LIMIT_EXCEEDED",
+                exception.getMessage(),
+                Set.of(),
+                null,
+                null,
+                List.of(),
+                exception.getMaxFiles(),
+                exception.getReceivedFiles()
         );
     }
 
@@ -45,7 +84,9 @@ public class ApiExceptionHandler {
             Set<String> detectedTypes,
             String highestSeverity,
             String maskedText,
-            List<DlpPublicMatch> matches
+            List<DlpPublicMatch> matches,
+            Integer maxFiles,
+            Integer receivedFiles
     ) {
     }
 }

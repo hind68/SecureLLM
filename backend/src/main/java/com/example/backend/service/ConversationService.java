@@ -50,6 +50,8 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class ConversationService {
 
     private static final Set<RoleMessage> CONTEXT_ROLES = Set.of(RoleMessage.USER, RoleMessage.ASSISTANT);
+    public static final int MAX_ATTACHMENTS_PER_MESSAGE = 10;
+    public static final String MAX_ATTACHMENTS_MESSAGE = "Vous pouvez joindre jusqu'à 10 fichiers par message. Supprimez un fichier avant d'en ajouter un autre.";
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
@@ -185,6 +187,9 @@ public class ConversationService {
         List<MultipartFile> safeFiles = files == null ? List.of() : files.stream()
                 .filter(file -> file != null && !file.isEmpty())
                 .toList();
+        if (safeFiles.size() > MAX_ATTACHMENTS_PER_MESSAGE) {
+            throw new AttachmentLimitExceededException(MAX_ATTACHMENTS_PER_MESSAGE, safeFiles.size());
+        }
         if (content.isBlank()) {
             if (!safeFiles.isEmpty()) {
                 return prepareStreamWithFiles(conversationId, content, safeFiles);

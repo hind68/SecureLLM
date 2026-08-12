@@ -267,6 +267,7 @@ export default function AppLayout({
           welcomeComposer={!chat.hasActiveMessages ? (
             <ChatComposer
               attachments={chat.attachments}
+              attachmentError={chat.attachmentError}
               canSend={chat.canSend}
               composerRef={chat.composerRef}
               draft={chat.draft}
@@ -289,6 +290,7 @@ export default function AppLayout({
         {chat.hasActiveMessages && (
           <ChatComposer
             attachments={chat.attachments}
+            attachmentError={chat.attachmentError}
             canSend={chat.canSend}
             composerRef={chat.composerRef}
             draft={chat.draft}

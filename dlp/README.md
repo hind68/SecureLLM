@@ -74,7 +74,7 @@ Configured through environment variables:
 |---|---:|
 | `DLP_MAX_TEXT_LENGTH` | `50000` |
 | `DLP_MAX_FILE_SIZE_MB` | `20` |
-| `DLP_MAX_ATTACHMENTS` | `5` |
+| `DLP_MAX_ATTACHMENTS` | `10` |
 | `DLP_MAX_ZIP_UNCOMPRESSED_MB` | `50` |
 | `DLP_MAX_ZIP_FILES` | `50` |
 | `DLP_MAX_ZIP_DEPTH` | `3` |

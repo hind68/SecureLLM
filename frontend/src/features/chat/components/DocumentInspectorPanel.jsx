@@ -464,6 +464,17 @@ function DetectionIndex({ matches, selectedMatchId, text, onSelect }) {
     <div className="document-threat-navigation shrink-0" aria-label="Liste des menaces détectées">
       <div className="document-threat-summary">
         <strong>{threatSummary(counts)}</strong>
+        {canExpand && (
+          <button type="button" className="document-threat-toggle" aria-label={expanded ? 'R\u00e9duire' : 'Voir les autres'} onClick={() => setExpanded((current) => !current)}>
+            <span>{expanded ? 'R\u00e9duire' : 'Voir les autres'}</span>
+            <img
+              src="/assets/down.png"
+              alt=""
+              aria-hidden="true"
+              className={`document-threat-toggle-icon ${expanded ? 'is-expanded' : ''}`}
+            />
+          </button>
+        )}
         <div className="document-threat-filters" aria-label="Filtres des menaces">
           {filters.map((item) => (
             <button
@@ -503,11 +514,6 @@ function DetectionIndex({ matches, selectedMatchId, text, onSelect }) {
           )
         })}
       </div>
-      {canExpand && (
-        <button type="button" className="document-threat-toggle" onClick={() => setExpanded((current) => !current)}>
-          {expanded ? 'Réduire' : 'Voir les autres'}
-        </button>
-      )}
     </div>
   )
 }

@@ -36,6 +36,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -151,6 +153,41 @@ class ConversationServiceTest {
         assertThat(preparation.context())
                 .extracting(LiteLlmMessage::content)
                 .containsExactly("Bonjour", "Salut");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "9",
+            "10"
+    })
+    void prepareStreamAcceptsAttachmentLimitBoundary(int fileCount) {
+        List<MultipartFile> files = testFiles(fileCount);
+        when(demoUserProvider.currentUser()).thenReturn(demoUser);
+        when(conversationRepository.findOwnedById(10L, demoUser)).thenReturn(Optional.of(conversation));
+        when(dlpService.safeMessageForLlm("Question", files, "demo-user"))
+                .thenReturn(new DlpSafeMessage("Question", "Question", null, List.of()));
+        when(messageRepository.findMaxOrdre(conversation)).thenReturn(0);
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(attachmentService.store(any(Message.class), eq(files), any())).thenReturn(List.of());
+        when(messageRepository.findByConversationAndStatutAndRoleInOrderByOrdreAsc(eq(conversation), eq(StatutMessage.TERMINE), any()))
+                .thenReturn(List.of());
+
+        service.prepareStream(10L, "Question", files);
+
+        verify(dlpService).safeMessageForLlm("Question", files, "demo-user");
+    }
+
+    @Test
+    void prepareStreamRejectsMoreThanTenFilesBeforeDlpAndLiteLlm() {
+        List<MultipartFile> files = testFiles(11);
+
+        assertThatThrownBy(() -> service.prepareStream(10L, "Question", files))
+                .isInstanceOf(AttachmentLimitExceededException.class)
+                .hasMessageContaining("11 fichiers");
+
+        verify(dlpService, never()).safeMessageForLlm(any(), any(), any());
+        verify(dlpService, never()).safeTextForLlm(any(), any());
+        verify(liteLlmService, never()).streamChat(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -618,6 +655,12 @@ class ConversationServiceTest {
                 Arguments.of("Adresse IP 192.168.1.24", "Adresse IP [IP_ADDRESS]", "192.168.1.24"),
                 Arguments.of("Token ghp_abcdefghijklmnopqrstuvwxyz123456", "Token [TOKEN]", "ghp_abcdefghijklmnopqrstuvwxyz123456")
         );
+    }
+
+    private static List<MultipartFile> testFiles(int count) {
+        return java.util.stream.IntStream.range(0, count)
+                .mapToObj(index -> (MultipartFile) new MockMultipartFile("files", "file-" + index + ".txt", "text/plain", "x".getBytes()))
+                .toList();
     }
 }
 
