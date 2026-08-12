@@ -433,6 +433,7 @@ function markCopied(copyKey, setCopiedKey) {
 
 function isCopyStateRelevant(copiedKey, messageId) {
   return (
+    copiedKey.startsWith('code-') ||
     copiedKey === `message-${messageId}` ||
     copiedKey === `prompt-${messageId}` ||
     copiedKey === `dlp-alert-${messageId}` ||

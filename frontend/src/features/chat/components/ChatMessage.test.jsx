@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import ChatMessage from './ChatMessage'
 import DocumentInspectorPanel from './DocumentInspectorPanel'
 import FileAttachmentCard from './FileAttachmentCard'
+import { hashText } from '../utils/markdown'
 
 describe('ChatMessage', () => {
   it('renders a persisted DLP block as a final error without loading dots', () => {
@@ -281,6 +282,31 @@ describe('ChatMessage', () => {
     expect(html).toContain('data-target-match-id="moroccan_cin_1"')
     expect(html).toContain('data-match-id="moroccan_cin_1"')
     expect(html).toContain('id="line-15"')
+  })
+
+  it('shows the copied label for a copied code block', () => {
+    const code = 'console.log("ok")'
+    const copiedKey = `code-${hashText(`javascript:${code}`)}`
+    const html = renderToStaticMarkup(
+      <ChatMessage
+        copiedKey={copiedKey}
+        fallbackModelName="GPT"
+        message={{
+          id: 11,
+          role: 'ASSISTANT',
+          content: `\`\`\`javascript\n${code}\n\`\`\``,
+        }}
+        onCopy={vi.fn()}
+        setCopiedKey={vi.fn()}
+      />,
+    )
+
+    const codeHeaderHtml = html.slice(html.indexOf('<div class="code-block-header">'), html.indexOf('</div><div style='))
+    expect(codeHeaderHtml).toContain('code-copy-button')
+    expect(codeHeaderHtml).toContain('is-copied')
+    expect(codeHeaderHtml).toContain('Copié')
+    expect(codeHeaderHtml).not.toContain('check-icon')
+    expect(codeHeaderHtml).not.toContain('copy-icon')
   })
 
   it('keeps many threat chips compact with summary filters and an expand action', () => {

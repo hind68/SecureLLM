@@ -153,7 +153,6 @@
 }
 
 /* Message actions and generation states */
-.code-block-header button,
 .message-actions button,
 .dlp-alert-heading button,
 .dlp-detail-heading button {
@@ -172,11 +171,6 @@
   transition: all 0.2s ease;
 }
 
-.code-block-header button {
-  color: #D1D5DB;
-}
-
-.code-block-header button:hover,
 .dlp-code-view .dlp-detail-heading button:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: #F9FAFB;
