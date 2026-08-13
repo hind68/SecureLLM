@@ -1740,15 +1740,19 @@
 }
 
 .document-inspector-title {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  max-width: none;
+  max-width: 250px;
 }
 
 .document-inspector-title strong {
+  display: block;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 250px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
