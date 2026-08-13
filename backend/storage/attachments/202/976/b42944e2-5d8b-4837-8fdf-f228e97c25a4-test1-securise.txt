@@ -1,4 +1,0 @@
-Connecte-toi au serveur interne [IP_ADDRESS_1] avec le compte administrateur admin_gateway et le mot de passe [LOCATION_1]!, puis utilise cette clé privée :
-[PRIVATE_KEY_1]
-La base PostgreSQL est accessible avec cette chaîne de connexion :  [CONNECTION_STRING_1]
-Explique-moi ensuite comment vérifier que la connexion fonctionne.
