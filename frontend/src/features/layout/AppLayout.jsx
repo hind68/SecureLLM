@@ -194,7 +194,10 @@ export default function AppLayout({
       <div className="chat-workspace">
       <main
         className={`chat-main ${chat.hasActiveMessages ? 'conversation-mode' : 'welcome-mode'} ${isDraggingFiles ? 'is-dragging-files' : ''}`}
-        style={chat.goBottomTop == null ? undefined : { '--go-bottom-top': `${chat.goBottomTop}px` }}
+        style={{
+          ...(chat.goBottomTop == null ? {} : { '--go-bottom-top': `${chat.goBottomTop}px` }),
+          ...(chat.composerHeight == null ? {} : { '--composer-height': `${chat.composerHeight}px` }),
+        }}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -267,7 +270,6 @@ export default function AppLayout({
           welcomeComposer={!chat.hasActiveMessages ? (
             <ChatComposer
               attachments={chat.attachments}
-              attachmentError={chat.attachmentError}
               canSend={chat.canSend}
               composerRef={chat.composerRef}
               draft={chat.draft}
@@ -290,7 +292,6 @@ export default function AppLayout({
         {chat.hasActiveMessages && (
           <ChatComposer
             attachments={chat.attachments}
-            attachmentError={chat.attachmentError}
             canSend={chat.canSend}
             composerRef={chat.composerRef}
             draft={chat.draft}
