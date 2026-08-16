@@ -384,7 +384,7 @@ function InspectionDocumentView({ state }) {
     setSelectedMatchId(id)
     const lineElement = Number.isInteger(line) ? document.getElementById(`line-${line}`) : null
     const matchElement = document.querySelector(`[data-match-id="${CSS.escape(id)}"]`)
-    ;(lineElement || matchElement)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+    ;(matchElement || lineElement)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
   }
 
   return (
@@ -475,7 +475,7 @@ function DetectionIndex({ matches, selectedMatchId, text, onSelect }) {
             />
           </button>
         )}
-        <div className="document-threat-filters" aria-label="Filtres des menaces">
+        <div className="document-threat-filters" aria-label="Filtres des menaces par criticité">
           {filters.map((item) => (
             <button
               type="button"

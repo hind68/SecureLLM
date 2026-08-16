@@ -427,7 +427,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
-  color: #991B1B;
+  color: #334155;
   font-size: 13px;
   font-weight: 650;
 }
@@ -436,11 +436,11 @@
   max-height: 320px;
   overflow: auto;
   margin: 0;
-  background-color: #111827;
-  border: 1px solid #374151;
+  background-color: #F8FAFC;
+  border: 1px solid #F1F5F9;
   border-radius: 6px;
-  color: #E5E7EB;
-  padding: 12px;
+  color: #475569;
+  padding: 8px 12px;
   white-space: pre;
   tab-size: 2;
 }
@@ -453,9 +453,9 @@
 
 .dlp-code-view mark {
   border-radius: 4px;
-  background-color: rgba(253, 224, 71, 0.15);
-  border: 1px solid rgba(253, 224, 71, 0.3);
-  color: #FDE047;
+  background-color: rgba(254, 226, 226, 0.7);
+  border: 1px solid #FECACA;
+  color: #B91C1C;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-weight: 600;
   padding: 2px 6px;
@@ -468,7 +468,7 @@
   flex-direction: column;
   gap: 8px;
   margin: 16px 0 0;
-  border-top: 1px solid #FECACA;
+  border-top: 1px solid #F1F5F9;
   padding: 16px 0 0;
   list-style: none;
 }
@@ -477,14 +477,14 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #7F1D1D;
+  color: #475569;
   font-size: 13px;
 }
 
 .dlp-detection-badge {
   border-radius: 6px;
   border: 1px solid #FEE2E2;
-  background-color: #FEF2F2;
+  background-color: #FFF7F7;
   color: #DC2626;
   font-size: 12px;
   font-weight: 500;
@@ -493,7 +493,7 @@
 }
 
 .dlp-detection-type {
-  color: #7F1D1D;
+  color: #475569;
   font-size: 13px;
 }
 
@@ -505,7 +505,7 @@
 
 .dlp-sensitive-warning {
   margin-bottom: 8px !important;
-  color: #7f1d1d !important;
+  color: #64748B !important;
   font-size: 13px !important;
   font-weight: 620;
 }
@@ -849,6 +849,10 @@
   width: 100%;
   max-width: 560px;
   min-width: 0;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #991B1B;
   margin-right: auto;
   overflow: hidden;
 }
@@ -891,13 +895,17 @@
   margin-inline: auto;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  background-color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.56);
   padding: 8px 12px;
-  box-shadow: 0 1px 2px rgba(127, 29, 29, 0.08);
+  box-shadow:
+    0 1px 2px rgba(127, 29, 29, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   transition:
     background-color 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .dlp-file-panel .file-message-card.dlp-file-card .file-type-icon {
@@ -947,13 +955,18 @@
 }
 
 .dlp-file-panel .file-message-card.dlp-file-card.is-clickable:hover {
-  border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(248, 113, 113, 0.32);
+  background-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 4px 10px rgba(127, 29, 29, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .dlp-file-panel .file-message-card.dlp-file-card.is-clickable:focus-visible {
-  border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(248, 113, 113, 0.34);
+  background-color: rgba(255, 255, 255, 0.78);
+  outline: 2px solid rgba(248, 113, 113, 0.24);
+  outline-offset: 2px;
 }
 
 .dlp-attachments-toggle {

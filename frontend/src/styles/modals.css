@@ -100,12 +100,14 @@
   max-width: 650px;
   --modal-x-padding: 18px;
   margin-top: 10vh;
-  border: 1px solid rgba(31, 41, 55, 0.08);
-  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 20px 54px rgba(15, 23, 42, 0.16);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(15, 23, 42, 0.04);
   display: grid;
-  gap: 16px;
+  gap: 0;
   padding: var(--modal-x-padding);
 }
 
@@ -119,10 +121,11 @@
 
 .search-modal-header h2 {
   margin: 0;
-  color: #1f2937;
-  font-size: 18px;
-  font-weight: 560;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .search-modal-header button {
@@ -161,14 +164,21 @@
 }
 
 .search-modal-filters {
-  display: grid;
-  grid-template-columns: 1fr minmax(210px, 0.9fr);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  align-items: start;
+  margin-top: 12px;
+  margin-bottom: 14px;
 }
 
 .search-modal-filters .archive-tabs {
+  flex: 1 1 260px;
   margin: 0;
+}
+
+.search-modal-filters .custom-dropdown {
+  flex: 1 1 210px;
 }
 
 .search-results {
@@ -209,7 +219,7 @@
   align-items: center;
   gap: 12px;
   font: inherit;
-  padding: 10px 11px;
+  padding: 10px 8px;
   text-align: left;
 }
 
@@ -239,9 +249,12 @@
 }
 
 .search-result-empty {
-  color: #6b7280;
+  color: #94a3b8;
   font-size: 13px;
-  padding: 12px 10px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 24px 16px 28px;
+  text-align: center;
 }
 
 

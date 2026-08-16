@@ -2,14 +2,15 @@
 .archive-tabs {
   flex-shrink: 0;
   width: 100%;
-  min-height: 36px;
+  min-height: 0;
+  height: auto;
   border: 0;
   border-radius: 8px;
   background: #f1f5f9;
   display: flex;
   gap: 0;
   margin: 0 0 12px;
-  padding: 4px;
+  padding: 3px;
 }
 
 .archive-tabs button {
@@ -21,10 +22,12 @@
   color: #64748b;
   cursor: pointer;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1.2;
-  padding: 6px 10px;
+  line-height: 1;
+  min-height: 0;
+  padding: 7px 14px;
+  border-radius: 7px;
   text-align: center;
   transition:
     background-color 160ms ease,
@@ -39,7 +42,8 @@
 .archive-tabs button.active {
   background: #ffffff;
   color: #1e293b;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
 }
 
 .history-error {
@@ -369,10 +373,15 @@
   padding-right: 6px;
 }
 
-.recent-section .conversation-model-icon {
-  width: 23px;
-  height: 23px;
-  flex: 0 0 23px;
+.conversation-model-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  min-width:24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  flex: 0 0 24px;
   object-fit: contain;
   filter: saturate(0.55) contrast(0.95);
 }

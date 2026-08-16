@@ -158,6 +158,10 @@ export default function Sidebar({
                 setSearch('')
                 setOpenMenuId(null)
               } else {
+                setActiveView('chat')
+                setModelFilter('')
+                setSearch('')
+                setOpenMenuId(null)
                 toggleCollapsedPanel('history')
               }
             }}

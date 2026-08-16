@@ -21,6 +21,9 @@ export default function ConversationList({
   setEditingConversationId,
   setEditingTitle,
 }) {
+  const isEmptyHistory = !isLoadingHistory && !historyError && conversations.length === 0
+  const hasConversationItems = conversations.length > 0
+
   return (
     <>
       {historyError && (
@@ -31,7 +34,7 @@ export default function ConversationList({
         </div>
       )}
 
-      <div className="history">
+      <div className={`history ${isEmptyHistory ? 'is-empty' : ''} ${hasConversationItems ? 'has-items' : ''}`}>
         {isLoadingHistory && <div className="history-empty">Chargement...</div>}
         {!isLoadingHistory && !historyError && conversations.length === 0 && (
           <div className="history-empty">
