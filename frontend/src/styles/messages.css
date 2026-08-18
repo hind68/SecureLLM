@@ -311,7 +311,7 @@
 
 .dlp-alert p {
   margin: 4px 0 0;
-  color: #B91C1C;
+  color: #881337;
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-line;
@@ -373,33 +373,47 @@
 
 .dlp-alert-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 2px;
   margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #FECACA;
+  padding: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(225, 29, 72, 0.08);
 }
 
 .dlp-alert-tabs button {
-  background: #FFFFFF;
-  border: 1px solid #FCA5A5;
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
   border-radius: 6px;
-  color: #991B1B;
+  background: transparent;
+  color: #BE123C;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
-  font-weight: 500;
-  padding: 6px 12px;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 10px;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
 }
 
 .dlp-alert-tabs button:hover {
-  background-color: #FEE2E2;
+  color: #9F1239;
 }
 
 .dlp-alert-tabs button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 0.5;
+}
+
+.dlp-alert-tabs button.is-active {
+  background: #FFFFFF;
+  color: #9F1239;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .dlp-file-panel {
@@ -418,7 +432,7 @@
 
 .dlp-detail-panel {
   margin-top: 12px;
-  animation: assistant-error-in 180ms ease-out both;
+  animation: none;
 }
 
 .dlp-detail-heading {
@@ -436,11 +450,11 @@
   max-height: 320px;
   overflow: auto;
   margin: 0;
-  background-color: #F8FAFC;
-  border: 1px solid #F1F5F9;
+  background-color: #1E293B;
+  border: 1px solid #374151;
   border-radius: 6px;
-  color: #475569;
-  padding: 8px 12px;
+  color: #E5E7EB;
+  padding: 12px;
   white-space: pre;
   tab-size: 2;
 }
@@ -453,54 +467,63 @@
 
 .dlp-code-view mark {
   border-radius: 4px;
-  background-color: rgba(254, 226, 226, 0.7);
-  border: 1px solid #FECACA;
-  color: #B91C1C;
+  background: #eaa95e19;
+  border: 1px solid #eaa95e4d;
+  color: #eaa95e;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-weight: 600;
-  padding: 2px 6px;
+  padding: 0 5px;
   font-size: 12px;
-  margin-left: 6px;
+  line-height: 1.25;
+  margin-left: 4px;
 }
 
 .dlp-detections {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 16px 0 0;
-  border-top: 1px solid #F1F5F9;
-  padding: 16px 0 0;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 10px;
   list-style: none;
 }
 
 .dlp-detections li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  border-bottom: 1px solid #E2E8F0;
   color: #475569;
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  padding: 9px 2px;
+}
+
+.dlp-detections li:last-child {
+  border-bottom: 0;
 }
 
 .dlp-detection-badge {
-  border-radius: 6px;
-  border: 1px solid #FEE2E2;
-  background-color: #FFF7F7;
-  color: #DC2626;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: #334155;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 650;
   letter-spacing: 0;
-  padding: 4px 8px;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dlp-detection-type {
-  color: #475569;
-  font-size: 13px;
+  display: none;
 }
 
 .dlp-detections small {
-  margin-left: auto;
-  color: #9CA3AF;
+  color: #64748B;
   font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .dlp-sensitive-warning {
@@ -644,7 +667,7 @@
   justify-content: flex-end;
   gap: 4px;
   margin: 4px 0 0 auto !important;
-  color: #D97706;
+  color: #a05600;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
