@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
-import { normalizeAssistantMarkdown, normalizeMarkdownCodeFences } from '../utils/markdown'
+import { isRenderableMarkdownImageUrl, normalizeAssistantMarkdown, normalizeMarkdownCodeFences } from '../utils/markdown'
 import CodeBlock from './CodeBlock'
 
 function MarkdownContent({ content, copiedKey, direction, onCopy, setCopiedKey }) {
@@ -76,20 +76,6 @@ export function MarkdownImage({ src = '', alt = '', title }) {
       onError={() => setHasError(true)}
     />
   )
-}
-
-export function isRenderableMarkdownImageUrl(src) {
-  const value = String(src || '').trim()
-  if (!value) return false
-
-  if (value.startsWith('/')) return true
-
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
 }
 
 function fallbackImageLabel(alt) {

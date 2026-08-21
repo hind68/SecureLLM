@@ -28,26 +28,22 @@ from app.ingestion.xlsx_parser import extract_text_from_xlsx, extract_xlsx_segme
 from app.ingestion.zip_parser import extract_text_from_zip, ZipSafetyError
 from app.ingestion.allowed_extensions import PLAIN_TEXT_EXTENSIONS, read_as_plain_text
 
-# Common Pillow-supported image formats. /analyse-image has no format-
-# specific parser to fall back on the way /analyse-file's dispatcher
-# does, so this is a fast reject for obviously-wrong uploads (video,
-# audio, etc.) before spending time on Image.open().
+# Formats d'image courants supportés par Pillow. /analyse-image n'a pas de
+# dispatcher de parseurs comme /analyse-file, donc on rejette rapidement les
+# uploads manifestement invalides avant de lancer Image.open().
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"}
 
 
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
     """
-    Rejects oversized requests using the Content-Length header, before
-    Starlette buffers the body into memory (or a temp file) at all. This
-    is the one check in this file that runs ahead of any UploadFile
-    parsing - the extension checks in the routes below only help once a
-    request has already been accepted and its (bounded) body received.
+    Rejette les requêtes trop volumineuses via l'en-tête Content-Length avant
+    que Starlette ne mette le corps en mémoire ou dans un fichier temporaire.
+    C'est le seul contrôle de ce fichier exécuté avant le parsing UploadFile.
 
-    Honest limitation: a client using chunked transfer-encoding (no
-    Content-Length header) skips this check entirely and only meets the
-    per-route extension/size handling further in. Most real HTTP clients
-    do send Content-Length for file uploads, but this isn't a complete
-    guarantee for every possible client.
+    Limite assumée : un client qui utilise le transfert chunked sans
+    Content-Length contourne ce contrôle et rencontre seulement les limites par
+    route plus loin. La plupart des clients HTTP réels envoient Content-Length
+    pour les uploads, mais ce n'est pas une garantie complète.
     """
     async def dispatch(self, request: Request, call_next):
         content_length = request.headers.get("content-length")
@@ -59,14 +55,14 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
                         content={"detail": f"Request body exceeds the {MAX_UPLOAD_BYTES} byte limit."},
                     )
             except ValueError:
-                pass  # malformed header - let normal request handling reject it
+                pass  # En-tête mal formé : laisser le traitement normal le rejeter.
         return await call_next(request)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load both NLP backends now, during startup, rather than paying that
-    # (multi-second) cost on whichever request happens to arrive first.
+    # Charger les backends NLP au démarrage évite de faire payer ce coût à la
+    # première requête utilisateur.
     warm_up_models()
     yield
 
@@ -96,6 +92,14 @@ def _error_response(code: str = "EXTRACTION_FAILED", message: str = "The content
 
 
 def _success_response(text: str, matches: list[dict], user_id: str | None = None, filename: str | None = None) -> dict:
+    """
+    Construit la réponse DLP publique sans retourner les valeurs sensibles.
+
+    Le texte original est retourné seulement comme extracted_text pour la
+    persistance backend et les parcours d'inspection ; les objets de match sont
+    nettoyés avant de franchir la frontière API afin que les logs et l'UI ne
+    reçoivent jamais le secret détecté lui-même.
+    """
     decision = evaluate_decision(matches)
     check_and_log_alerts(
         matches,
@@ -118,6 +122,12 @@ def _success_response(text: str, matches: list[dict], user_id: str | None = None
 
 
 def _drop_neutralized_placeholder_matches(text: str, matches: list[dict]) -> list[dict]:
+    """
+    Évite de redétecter les placeholders déjà produits par ce service.
+
+    Cela garde le contenu masqué idempotent lorsqu'un prompt sûr stocké est
+    réanalysé par la passerelle Spring avant d'être réutilisé comme contexte.
+    """
     kept = []
     for match in matches:
         value = match.get("value")
@@ -131,7 +141,7 @@ def _drop_neutralized_placeholder_matches(text: str, matches: list[dict]) -> lis
 
 def run_pipeline(text: str, user_id: str | None = None, filename: str | None = None) -> dict:
     """
-    The single shared detect -> dedup -> id -> alert -> mask pipeline.
+    Pipeline partagé unique : détection -> déduplication -> id -> alerte -> masquage.
     """
     if len(text) > DLP_MAX_TEXT_LENGTH:
         raise HTTPException(
@@ -141,7 +151,7 @@ def run_pipeline(text: str, user_id: str | None = None, filename: str | None = N
 
     lang = detect_language(text)
 
-    # Run Regex + our multilingual NER engine
+    # Exécuter les regex et notre moteur NER multilingue.
     combined = _drop_neutralized_placeholder_matches(
         text,
         run_regex_detectors(text) + detect_with_presidio(text, language=lang),
@@ -155,22 +165,15 @@ def run_pipeline(text: str, user_id: str | None = None, filename: str | None = N
 
 def run_pipeline_for_segments(known_text: str, free_text: str, user_id: str | None = None, filename: str | None = None) -> dict:
     """
-    Like run_pipeline, but for input already split into a "known PII
-    shape" segment and a "free text" segment (see structured_routing.py
-    and extract_csv_segments/extract_xlsx_segments). The known segment
-    only goes through the regex engine; the free-text segment gets the
-    full regex + NER treatment - NLP is the expensive part of
-    this pipeline, and there's no reason to run spaCy on a
-    column already labeled "email" or "iban" when a regex pattern
-    already covers it. Both segments' matches are merged into one
-    response over their combined text, so ids/masking/alerting all see
-    a single consistent result exactly like run_pipeline's callers expect.
+    Variante de run_pipeline pour une entrée déjà séparée entre un segment de
+    données connues et un segment de texte libre. Le segment connu passe
+    seulement par les regex ; le texte libre reçoit le traitement complet regex
+    + NER, car le NLP est la partie coûteuse du pipeline. Les deux segments sont
+    ensuite fusionnés pour conserver des ids, masquages et alertes cohérents.
     """
     if not known_text:
-        # No known-type segment at all (true for every file type except
-        # CSV/XLSX, and even those if no column header matched) - avoid
-        # a spurious leading "\n" that would shift every offset by one
-        # for no reason.
+        # Aucun segment de type connu : éviter un "\n" initial artificiel qui
+        # décalerait tous les offsets d'un caractère.
         return run_pipeline(free_text, user_id=user_id, filename=filename)
 
     combined_text = known_text + "\n" + free_text
@@ -187,7 +190,7 @@ def run_pipeline_for_segments(known_text: str, free_text: str, user_id: str | No
         free_text,
         run_regex_detectors(free_text) + detect_with_presidio(free_text, language=lang),
     )
-    offset = len(known_text) + 1  # +1 for the "\n" joiner above
+    offset = len(known_text) + 1  # +1 pour le séparateur "\n" ci-dessus.
     for m in free_matches:
         m["start"] += offset
         m["end"] += offset
@@ -212,7 +215,7 @@ def analyse_image(file: UploadFile = File(...), user_id: str | None = Form(None)
             detail=f"Unsupported image type: {ext!r}. Supported: {', '.join(sorted(_IMAGE_EXTENSIONS))}",
         )
 
-    # Blocking call handles Tesseract OCR correctly in FastAPI's thread pool
+    # L'appel bloquant laisse FastAPI exécuter Tesseract correctement dans son pool.
     content = _read_upload_limited(file)
 
     try:
@@ -223,9 +226,8 @@ def analyse_image(file: UploadFile = File(...), user_id: str | None = Form(None)
     try:
         extracted_text = extract_text_from_image_object(image)
     except OCRExtractionError:
-        # Surface this as a real error rather than quietly returning
-        # flagged=False - that would look identical to "no PII found"
-        # when the true story is "we couldn't read the image at all".
+        # Retourner une vraie erreur plutôt que flagged=False, qui ressemblerait
+        # à "aucune donnée sensible trouvée" alors que l'image est illisible.
         return _error_response()
 
     return run_pipeline(extracted_text, user_id=user_id, filename=file.filename)
@@ -248,12 +250,9 @@ def analyse_pdf(file: UploadFile = File(...), user_id: str | None = Form(None)):
     return run_pipeline(extracted_text, user_id=user_id, filename=file.filename)
 
 
-# docx/pptx/csv/xlsx/zip parsers existed as standalone modules but nothing
-# in main.py ever called them - same class of gap as the earlier PDF/OCR
-# wiring issue. One dispatcher endpoint here rather than more copies of
-# the same request-handling boilerplate. Source-code/plain-text
-# extensions all share one reader (read_as_plain_text) rather than
-# needing an entry each.
+# Les parseurs docx/pptx/csv/xlsx/zip existent comme modules autonomes ; ce
+# dispatcher central évite de dupliquer le boilerplate de traitement des
+# requêtes. Les extensions texte/code partagent le même lecteur brut.
 _FILE_EXTRACTORS = {
     ".docx": extract_text_from_docx,
     ".pptx": extract_text_from_pptx,
@@ -263,9 +262,8 @@ _FILE_EXTRACTORS = {
     **{ext: read_as_plain_text for ext in PLAIN_TEXT_EXTENSIONS},
 }
 
-# CSV/XLSX get the two-tier regex-only-vs-full-pipeline treatment (see
-# run_pipeline_for_segments) instead of the flat single-string dispatch
-# above - checked first in analyse_file, below.
+# CSV/XLSX utilisent le traitement en deux segments de run_pipeline_for_segments
+# plutôt que le dispatch plat en chaîne unique ci-dessus.
 _SEGMENTED_EXTRACTORS = {
     ".csv": extract_csv_segments,
     ".xlsx": extract_xlsx_segments,
@@ -274,12 +272,10 @@ _SEGMENTED_EXTRACTORS = {
 
 @app.post("/analyse-file", response_model=AnalyseResponse)
 def analyse_file(file: UploadFile = File(...), user_id: str | None = Form(None)):
-    # Extension is checked before file.file.read() below - an unsupported
-    # file (video, audio, or anything else not in _FILE_EXTRACTORS) is
-    # rejected on the filename alone, without ever touching its contents.
-    # Note this doesn't stop the file from having already been received
-    # onto the server as part of normal request handling - see
-    # MaxBodySizeMiddleware above for the check that runs before that.
+    # L'extension est vérifiée avant file.file.read() : un fichier non supporté
+    # est rejeté sur son nom, sans lire son contenu. Cela n'empêche pas le
+    # serveur d'avoir déjà reçu le corps HTTP ; MaxBodySizeMiddleware couvre le
+    # contrôle qui intervient avant cette étape.
     ext = os.path.splitext(file.filename or "")[1].lower()
     segmented_extractor = _SEGMENTED_EXTRACTORS.get(ext)
     extractor = _FILE_EXTRACTORS.get(ext)
@@ -297,21 +293,16 @@ def analyse_file(file: UploadFile = File(...), user_id: str | None = Form(None))
         else:
             extracted_text = extractor(tmp_path)
     except ZipSafetyError:
-        # Distinct from a generic bad-file error: this means the archive
-        # was readable but tripped a safety limit (size, entry count,
-        # compression ratio, nesting depth) or had nothing usable inside
-        # it - worth telling the caller which, rather than a generic
-        # "couldn't read it".
+        # Cas distinct d'un mauvais fichier générique : l'archive est lisible
+        # mais dépasse une limite de sécurité ou ne contient rien d'utilisable.
         return _error_response("EXTRACTION_FAILED", "The content could not be safely analysed.")
     except Exception:
         return _error_response()
     finally:
         os.remove(tmp_path)
 
-    # Outside the try/finally above on purpose: run_pipeline(_for_segments)
-    # can itself raise HTTPException (e.g. 413 for text over the length
-    # limit), which the broad `except Exception` above would otherwise
-    # catch and mask as a generic 400 "could not process" error.
+    # Hors du try/finally volontairement : run_pipeline(_for_segments) peut
+    # lever HTTPException, que le except générique masquerait sinon en 400.
     if segmented_extractor is not None:
         return run_pipeline_for_segments(known_text, free_text, user_id=user_id, filename=file.filename)
     return run_pipeline(extracted_text, user_id=user_id, filename=file.filename)
@@ -339,12 +330,10 @@ def ready():
 
 
 # ---------------------------------------------------------------------
-# /analyse-message: the actual "text + attachments together" endpoint.
-# A message is usually - not always - accompanied by one or more files,
-# so both are optional and either (or both) can be present. Every
-# supported upload type funnels through _extract_known_free_text so this
-# endpoint doesn't need its own copy of the image/pdf/docx/etc dispatch
-# logic that analyse_image/analyse_pdf/analyse_file already have.
+# /analyse-message : endpoint réel "texte + pièces jointes ensemble".
+# Un message peut être accompagné de fichiers, donc les deux côtés sont
+# optionnels tant qu'au moins l'un existe. Tous les uploads supportés passent
+# par _extract_known_free_text pour éviter de dupliquer la logique de dispatch.
 # ---------------------------------------------------------------------
 
 _ALL_SUPPORTED_UPLOAD_EXTENSIONS = (
@@ -354,11 +343,9 @@ _ALL_SUPPORTED_UPLOAD_EXTENSIONS = (
 
 def _extract_known_free_text(filename: str, tmp_path: str) -> tuple[str, str]:
     """
-    Uniform (known_text, free_text) extraction for any supported upload
-    type. known_text is only ever non-empty for CSV/XLSX (see
-    _SEGMENTED_EXTRACTORS) - everything else's full content counts as
-    free text, same as run_pipeline_for_segments treats a plain
-    run_pipeline call when there's no known segment at all.
+    Extraction uniforme (known_text, free_text) pour tout upload supporté.
+    known_text n'est non vide que pour CSV/XLSX ; tout autre contenu est traité
+    comme texte libre.
     """
     ext = os.path.splitext(filename or "")[1].lower()
 
@@ -390,6 +377,14 @@ def analyse_message(
     files: list[UploadFile] = File([]),
     user_id: str | None = Form(None),
 ):
+    """
+    Analyse le texte utilisateur et toutes les pièces jointes comme une seule
+    soumission.
+
+    La passerelle consomme la décision agrégée : toute source bloquée bloque le
+    message complet, car envoyer seulement le sous-ensemble apparemment sûr
+    rendrait l'historique trompeur et pourrait exposer du contexte partiel.
+    """
     if not text and not files:
         raise HTTPException(status_code=400, detail="Provide text, at least one file, or both.")
     if len(files) > DLP_MAX_ATTACHMENTS:
@@ -404,11 +399,9 @@ def analyse_message(
         source = file.filename or "unknown"
         ext = os.path.splitext(source)[1].lower()
 
-        # Same "reject cheap, reject early" principle as analyse_file:
-        # an unsupported extension is recorded as a skipped source and
-        # the loop moves on - one bad attachment among several shouldn't
-        # abort the whole message, any more than one bad file inside a
-        # zip aborts the rest of the archive (see zip_parser.py).
+        # Même principe "rejeter tôt et à faible coût" que analyse_file : une
+        # extension non supportée est enregistrée comme source ignorée et la
+        # boucle continue.
         if ext not in _ALL_SUPPORTED_UPLOAD_EXTENSIONS:
             results.append({"source": source, **_error_response("UNSUPPORTED_FILE_TYPE", "The content could not be safely analysed.")})
             continue

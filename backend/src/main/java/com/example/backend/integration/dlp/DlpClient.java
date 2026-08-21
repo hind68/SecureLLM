@@ -16,6 +16,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
 @Component
+/**
+ * Client HTTP du service DLP FastAPI local.
+ *
+ * <p>Les erreurs de transport sont volontairement converties en
+ * DlpUnavailableException afin que les couches supérieures échouent fermées et
+ * évitent d'envoyer des données non vérifiées à LiteLLM.</p>
+ */
 public class DlpClient {
 
     private static final MediaType APPLICATION_JSON_UTF8 = new MediaType("application", "json", StandardCharsets.UTF_8);
@@ -39,9 +46,9 @@ public class DlpClient {
     }
 
     /**
-     * Calls the DLP analyser before any LLM request. Any transport, timeout, HTTP,
-     * or JSON-shape problem is converted to an unavailable error so callers can
-     * apply the gateway fail-closed policy without leaking prompt content.
+     * Appelle l'analyseur DLP avant toute requête LLM. Tout problème de
+     * transport, timeout, HTTP ou forme JSON est converti en erreur
+     * d'indisponibilité pour appliquer la politique fail-closed.
      */
     public DlpAnalysisResponse analyse(String text, String userId) {
         try {
@@ -65,6 +72,10 @@ public class DlpClient {
         }
     }
 
+    /**
+     * Envoie le corps du message et toutes les pièces jointes dans une seule
+     * requête multipart afin que le DLP produise une décision globale.
+     */
     public DlpMultiSourceAnalysisResponse analyseMessage(String text, List<MultipartFile> files, String userId) {
         try {
             MultipartBodyBuilder body = new MultipartBodyBuilder();
@@ -112,6 +123,8 @@ public class DlpClient {
             return new ByteArrayResource(bytes) {
                 @Override
                 public String getFilename() {
+                    // MultipartBodyBuilder a besoin d'un nom de fichier pour
+                    // construire une vraie partie fichier.
                     return filename;
                 }
             };

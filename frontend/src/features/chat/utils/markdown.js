@@ -192,6 +192,20 @@ export function formatLanguageName(language) {
   return names[normalized] || 'Code'
 }
 
+export function isRenderableMarkdownImageUrl(src) {
+  const value = String(src || '').trim()
+  if (!value) return false
+
+  if (value.startsWith('/')) return true
+
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export function hashText(value) {
   let hash = 0
   for (let index = 0; index < value.length; index += 1) {

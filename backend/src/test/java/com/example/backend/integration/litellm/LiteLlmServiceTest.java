@@ -1,5 +1,6 @@
 package com.example.backend.integration.litellm;
 
+import tools.jackson.databind.ObjectMapper;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
@@ -67,8 +68,62 @@ class LiteLlmServiceTest {
                 .isEqualTo(lastUserMessage);
     }
 
+    @Test
+    void extractStreamingTokenReadsContentFromNormalSseDataLine() throws Exception {
+        assertThat(extractStreamingToken(newService(), "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}"))
+                .isEqualTo("Hello");
+    }
+
+    @Test
+    void extractStreamingTokenSkipsDoneSentinel() throws Exception {
+        assertThat(extractStreamingToken(newService(), "data: [DONE]")).isEmpty();
+    }
+
+    @Test
+    void extractStreamingTokenDecodesUnicodeEscape() throws Exception {
+        assertThat(extractStreamingToken(newService(), "data: {\"choices\":[{\"delta\":{\"content\":\"caf\\u00e9\"}}]}"))
+                .isEqualTo("café");
+    }
+
+    @Test
+    void extractStreamingTokenReturnsEmptyForNullContent() throws Exception {
+        assertThat(extractStreamingToken(newService(), "data: {\"choices\":[{\"delta\":{\"content\":null}}]}"))
+                .isEmpty();
+    }
+
+    @Test
+    void extractStreamingTokenHandlesMultipleConcatenatedDataLinesInOneChunk() throws Exception {
+        String chunk = "data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n"
+                + "data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}";
+
+        assertThat(extractStreamingToken(newService(), chunk)).isEqualTo("Hello");
+    }
+
+    @Test
+    void extractStreamingTokenIgnoresContentKeyOutsideDeltaPath() throws Exception {
+        String chunk = "data: {\"id\":\"abc\",\"model\":{\"content\":\"not-the-real-content\"},"
+                + "\"choices\":[{\"delta\":{\"content\":\"Real\"}}]}";
+
+        assertThat(extractStreamingToken(newService(), chunk)).isEqualTo("Real");
+    }
+
+    @Test
+    void extractStreamingTokenIgnoresNonJsonFragmentsWithoutThrowing() throws Exception {
+        assertThat(extractStreamingToken(newService(), "data: not-json")).isEmpty();
+    }
+
+    private LiteLlmService newService() {
+        return new LiteLlmService("http://localhost:4000", "sk-test", new ObjectMapper());
+    }
+
+    private String extractStreamingToken(LiteLlmService service, String chunk) throws Exception {
+        Method method = LiteLlmService.class.getDeclaredMethod("extractStreamingToken", String.class);
+        method.setAccessible(true);
+        return (String) method.invoke(service, chunk);
+    }
+
     private List<?> payloadMessages(List<LiteLlmMessage> inputMessages) throws Exception {
-        LiteLlmService service = new LiteLlmService("http://localhost:4000", "sk-test");
+        LiteLlmService service = newService();
         Method requestBody = LiteLlmService.class.getDeclaredMethod("requestBody", String.class, boolean.class, List.class);
         requestBody.setAccessible(true);
 

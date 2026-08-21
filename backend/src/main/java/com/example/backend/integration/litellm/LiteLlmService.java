@@ -12,12 +12,27 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 
 @Service
+/**
+ * Adaptateur autour de l'API chat compatible OpenAI exposée par LiteLLM.
+ *
+ * <p>Le reste du backend manipule des alias de modèles internes et des
+ * messages sécurisés. Cette classe est le seul endroit qui connaît le format
+ * des payloads LiteLLM et la lecture des fragments de streaming.</p>
+ */
 public class LiteLlmService {
 
+    /**
+     * Instruction globale ajoutée à chaque requête fournisseur après masquage
+     * DLP. Elle rappelle que les placeholders sont des occultations finales,
+     * pas des indices à reconstruire par le modèle.
+     */
     private static final LiteLlmMessage SYSTEM_INSTRUCTION = new LiteLlmMessage(
             "system",
             """
@@ -85,21 +100,28 @@ public class LiteLlmService {
 
     private final WebClient webClient;
     private final String masterKey;
+    private final ObjectMapper objectMapper;
 
     public LiteLlmService(
             @Value("${litellm.base-url}") String baseUrl,
-            @Value("${litellm.master-key:}") String masterKey
+            @Value("${litellm.master-key:}") String masterKey,
+            ObjectMapper objectMapper
     ) {
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
                 .build();
         this.masterKey = masterKey;
+        this.objectMapper = objectMapper;
     }
 
     public String chat(String model, String message) {
         return chat(model, List.of(new LiteLlmMessage("user", message)));
     }
 
+    /**
+     * Exécute une complétion non streamée pour les appels qui attendent une
+     * réponse complète en une seule fois.
+     */
     public String chat(String model, List<LiteLlmMessage> messages) {
         Map<String, Object> body = requestBody(model, false, messages);
 
@@ -120,6 +142,10 @@ public class LiteLlmService {
         return answer;
     }
 
+    /**
+     * Démarre un stream réactif LiteLLM et transmet chaque delta de contenu aux
+     * callbacks fournis.
+     */
     public void streamChat(
             String model,
             List<LiteLlmMessage> messages,
@@ -145,6 +171,8 @@ public class LiteLlmService {
 
     private List<Map<String, String>> toPayload(List<LiteLlmMessage> messages) {
         List<Map<String, String>> payload = new ArrayList<>();
+        // Garder l'instruction système hors de l'historique persistant permet
+        // de la faire évoluer sans réécrire les messages stockés.
         payload.add(toPayloadMessage(SYSTEM_INSTRUCTION));
         messages.stream()
                 .map(this::toPayloadMessage)
@@ -160,6 +188,8 @@ public class LiteLlmService {
             body.put("stream", true);
         }
         if (isGeminiModel(model)) {
+            // Les paramètres de sécurité Gemini ne sont envoyés qu'aux backends
+            // compatibles ; d'autres fournisseurs peuvent rejeter ces champs.
             body.put("safety_settings", GEMINI_SAFETY_SETTINGS);
         }
         return body;
@@ -185,6 +215,9 @@ public class LiteLlmService {
 
             String normalized = line;
             if (normalized.startsWith("data:")) {
+                // LiteLLM diffuse des frames SSE au format OpenAI. WebClient
+                // les expose comme chaînes, donc on retire le préfixe de
+                // transport avant d'extraire le champ JSON de contenu.
                 normalized = normalized.substring(5);
                 if (normalized.startsWith(" ") && normalized.startsWith("{", 1)) {
                     normalized = normalized.substring(1);
@@ -197,44 +230,14 @@ public class LiteLlmService {
     }
 
     private String extractContentField(String json) {
-        String marker = "\"content\"";
-        int markerIndex = json.indexOf(marker);
-        if (markerIndex < 0) {
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            return root.path("choices").path(0).path("delta").path("content").asString("");
+        } catch (JacksonException exception) {
+            // Un fragment non-JSON (frame de contrôle, ping, etc.) ne doit pas
+            // interrompre le stream ; on l'ignore simplement.
             return "";
         }
-
-        int colonIndex = json.indexOf(':', markerIndex + marker.length());
-        if (colonIndex < 0) {
-            return "";
-        }
-
-        int startQuote = json.indexOf('"', colonIndex + 1);
-        if (startQuote < 0) {
-            return "";
-        }
-
-        StringBuilder value = new StringBuilder();
-        boolean escaped = false;
-        for (int i = startQuote + 1; i < json.length(); i++) {
-            char current = json.charAt(i);
-            if (escaped) {
-                value.append(switch (current) {
-                    case 'n' -> '\n';
-                    case 'r' -> '\r';
-                    case 't' -> '\t';
-                    case '"', '\\', '/' -> current;
-                    default -> current;
-                });
-                escaped = false;
-            } else if (current == '\\') {
-                escaped = true;
-            } else if (current == '"') {
-                return value.toString();
-            } else {
-                value.append(current);
-            }
-        }
-        return "";
     }
 
     private String extractAnswer(Map<?, ?> response) {

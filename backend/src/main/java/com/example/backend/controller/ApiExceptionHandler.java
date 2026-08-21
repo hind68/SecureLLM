@@ -14,8 +14,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
+/**
+ * Normalise les échecs backend en contrats d'erreur API stables pour l'UI React.
+ *
+ * Les erreurs DLP exposent volontairement seulement des métadonnées sûres :
+ * types détectés, sévérité, texte masqué et localisations publiques.
+ */
 public class ApiExceptionHandler {
 
+    /**
+     * Retourne 422 lorsque le contenu utilisateur a été analysé avec succès,
+     * mais que la politique décide qu'il ne doit pas quitter la passerelle.
+     */
     @ExceptionHandler(DlpBlockedException.class)
     @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
     public ApiError handleDlpBlocked(DlpBlockedException exception) {
@@ -47,6 +57,10 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(ResponseStatusException.class)
+    /**
+     * Préserve les statuts HTTP explicites levés par les services tout en
+     * gardant un corps de réponse cohérent avec les autres erreurs API.
+     */
     public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException exception) {
         HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
         return ResponseEntity

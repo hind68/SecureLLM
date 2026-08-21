@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import MarkdownContent, { isRenderableMarkdownImageUrl } from './MarkdownContent'
+import MarkdownContent from './MarkdownContent'
+import { isRenderableMarkdownImageUrl } from '../utils/markdown'
 
 describe('MarkdownContent images', () => {
   it('renders valid http images with responsive-safe attributes', () => {

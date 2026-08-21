@@ -173,6 +173,10 @@ function DlpBlockedMessage({ alertCopied, copied, message, onCopyAlert, onCopySa
   const originalText = message.dlpOriginalText || ''
   const hasOriginal = Boolean(originalText)
   const hasOpenDetails = !hasDlpFiles
+  // Les blocages texte gardent les vues sécurisée/originale/localisation dans
+  // une seule surface à onglets. Les blocages fichier conservent volontairement
+  // leur parcours séparé, car l'aperçu original et le renvoi sécurisé demandent
+  // des contrôles plus riches.
   const summary = dlpUserMessage({
     code: 'DLP_BLOCKED',
     detectedTypes: message.dlpDetectedTypes,

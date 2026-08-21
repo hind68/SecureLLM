@@ -2,8 +2,6 @@ package com.example.backend.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,6 +14,13 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "attachment")
+/**
+ * Upload stocké et lié au message qui l'a introduit.
+ *
+ * <p>Le fichier original est conservé sur disque, tandis que le texte extrait,
+ * le texte masqué et les métadonnées publiques DLP sont persistés ici pour les
+ * parcours d'inspection et de renvoi sécurisé.</p>
+ */
 public class Attachment {
 
     @Id
@@ -27,7 +32,7 @@ public class Attachment {
     private Message message;
 
     @Column(name = "original_filename", nullable = false, length = 255)
-    private String originalFilename;
+    private String originalFilename; 
 
     @Column(name = "storage_key", nullable = false, length = 500)
     private String storageKey;

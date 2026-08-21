@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.PathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,6 +30,13 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
+/**
+ * Gère la persistance et la récupération sécurisée des pièces jointes.
+ *
+ * <p>Les fichiers sont stockés sur disque, tandis que les métadonnées DLP et
+ * les textes extraits/masqués sont persistés en base afin que l'UI puisse
+ * inspecter le contenu bloqué ou masqué après rafraîchissement.</p>
+ */
 public class AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
@@ -47,6 +54,10 @@ public class AttachmentService {
     }
 
     @Transactional
+    /**
+     * Stocke les fichiers uploadés avec l'analyse DLP produite avant que le
+     * message atteigne la couche modèle.
+     */
     public List<AttachmentMetadata> store(Message message, List<MultipartFile> files, List<DlpAttachmentAnalysis> analyses) {
         if (files == null || files.isEmpty()) {
             return List.of();
@@ -77,6 +88,9 @@ public class AttachmentService {
                     storageKey,
                     analysis == null ? safeMimeType(file.getContentType()) : analysis.mimeType(),
                     file.getSize(),
+                    // Une analyse manquante devient une métadonnée bloquée/en
+                    // erreur pour éviter de marquer une pièce jointe sûre par
+                    // accident.
                     analysis == null ? "BLOCK" : analysis.decision(),
                     analysis == null ? "ERROR" : analysis.extractionStatus(),
                     analysis == null ? "" : analysis.extractedText(),
@@ -111,6 +125,10 @@ public class AttachmentService {
     }
 
     @Transactional(readOnly = true)
+    /**
+     * Retourne le fichier original stocké uniquement après vérification de la
+     * propriété via la requête repository.
+     */
     public ResponseEntity<Resource> originalContent(Long id) {
         Attachment attachment = ownedAttachment(id);
         Path path = resolveStorageKey(attachment.getStorageKey());
@@ -120,7 +138,7 @@ public class AttachmentService {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(attachment.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + safeHeaderFilename(attachment.getOriginalFilename()) + "\"")
-                .body(new PathResource(path));
+                .body(new FileSystemResource(path));
     }
 
     @Transactional(readOnly = true)
@@ -138,6 +156,10 @@ public class AttachmentService {
     }
 
     @Transactional
+    /**
+     * Retourne le texte masqué de la pièce jointe, en le reconstruisant depuis
+     * les spans publics stockés quand les anciennes lignes n'ont pas masked_text.
+     */
     public AttachmentSecureResponse secure(Long id) {
         Attachment attachment = ownedAttachment(id);
         String maskedText = ensureMaskedText(attachment);
@@ -196,6 +218,7 @@ public class AttachmentService {
     private Path resolveStorageKey(String storageKey) {
         Path path = storageRoot.resolve(storageKey).normalize();
         if (!path.startsWith(storageRoot)) {
+            // Empêche le path traversal via une clé de stockage ou un nom forgé.
             throw new ResponseStatusException(NOT_FOUND, "Attachment not found");
         }
         return path;
@@ -309,6 +332,8 @@ public class AttachmentService {
         String extractedText = attachment.getExtractedText() == null ? "" : attachment.getExtractedText();
         maskedText = maskFromStoredMatches(extractedText, parseMatches(attachment.getMatchesJson()));
         if (!maskedText.isBlank()) {
+            // Backfill paresseux pour accélérer les rafraîchissements sans
+            // migration réécrivant toutes les pièces jointes existantes.
             attachment.setMaskedText(maskedText);
             attachmentRepository.save(attachment);
         }

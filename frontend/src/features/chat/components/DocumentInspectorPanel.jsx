@@ -34,7 +34,13 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
   const [showTextSizeMenu, setShowTextSizeMenu] = useState(false)
   const textSizeControlRef = useRef(null)
 
-  useEffect(() => {
+  // Reset per-attachment view state during render (React's documented pattern
+  // for "adjusting state when a prop changes") instead of an effect, so
+  // switching documents never renders one frame of the previous document's
+  // state before the reset commits.
+  const [resetKey, setResetKey] = useState(attachmentKey)
+  if (resetKey !== attachmentKey) {
+    setResetKey(attachmentKey)
     setActiveTab(initialMode(target))
     setOriginalState(initialOriginalState())
     setInspectionState(initialInspectionState(target))
@@ -42,7 +48,7 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
     setCopySucceeded(false)
     setFontSize(READER_FONT_SIZE)
     setShowTextSizeMenu(false)
-  }, [attachmentKey])
+  }
 
   useEffect(() => {
     if (!attachment) return undefined
@@ -85,6 +91,10 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
       controller.abort()
       if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
+    // attachmentKey is a deliberate stand-in for attachment/target identity:
+    // both are recreated on every parent render, and depending on them
+    // directly would refetch the document on unrelated re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachmentKey])
 
   useEffect(() => {
@@ -156,6 +166,9 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
       cancelled = true
       controller.abort()
     }
+    // See the loadOriginal effect above: attachmentKey intentionally stands
+    // in for attachment/target identity to avoid refetching on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachmentKey])
 
   useEffect(() => {
@@ -185,6 +198,9 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
       cancelled = true
       controller.abort()
     }
+    // See the loadOriginal effect above: attachmentKey intentionally stands
+    // in for attachment/target identity to avoid refetching on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachmentKey])
 
   const filename = attachment?.filename || attachment?.name || 'Document'
@@ -305,7 +321,7 @@ export default function DocumentInspectorPanel({ attachment: inspectionTarget, c
             <span>Copier</span>
           </button>
           <button type="button" className="document-icon-action labeled" title={hasSecureText ? 'Télécharger la version sécurisée' : 'Version sécurisée indisponible'} aria-label="Télécharger la version sécurisée" disabled={!hasSecureText} onClick={handleDownloadSecure}>
-            <img src="/assets/downloads.png" alt="" aria-hidden="true" />
+            <img src="/assets/download.png" alt="" aria-hidden="true" />
             <span>Télécharger</span>
           </button>
           <button type="button" className="document-icon-action primary labeled" title={hasSecureText ? 'Ajouter la version sécurisée aux pièces jointes' : 'Version sécurisée indisponible'} aria-label="Ajouter la version sécurisée aux pièces jointes" disabled={!hasSecureText} onClick={handleAttachSecureVersion}>

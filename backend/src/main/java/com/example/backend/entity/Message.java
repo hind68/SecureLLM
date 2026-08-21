@@ -19,6 +19,14 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "message")
+/**
+ * Tour de conversation persisté.
+ *
+ * <p>Un message peut représenter un échange utilisateur/assistant normal ou
+ * une tentative bloquée par le DLP. Les métadonnées DLP sont stockées avec le
+ * contenu pour expliquer un blocage après rafraîchissement sans exposer la
+ * valeur sensible originale.</p>
+ */
 public class Message {
 
     @Id
