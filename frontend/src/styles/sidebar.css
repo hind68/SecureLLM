@@ -7,6 +7,9 @@
   --sidebar-item-width: calc(100% - 16px);
   --sidebar-item-radius: 9px;
   --sidebar-hover-subtle: rgba(32, 37, 47, 0.045);
+  /* Keeps the icon's horizontal center identical to the closed state
+     (0 margin + 56px column): --sidebar-item-margin + this/2 = 28px. */
+  --sidebar-icon-column-open: 40px;
 }
 
 .sidebar {
@@ -158,7 +161,7 @@
   height: 36px;
   border-radius: var(--sidebar-item-radius);
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-icon-column-open) minmax(0, 1fr);
   align-items: center;
   gap: 0;
   margin: 0 var(--sidebar-item-margin);
@@ -180,7 +183,7 @@
 .sidebar-icon,
 .user-avatar-wrapper {
   position: relative;
-  width: 48px;
+  width: var(--sidebar-icon-column-open);
   height: 36px;
   display: grid;
   place-items: center;
@@ -320,7 +323,7 @@
   height: 40px;
   border-radius: var(--sidebar-item-radius);
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-icon-column-open) minmax(0, 1fr);
   align-items: center;
   gap: 0;
   margin: 0 var(--sidebar-item-margin);
